@@ -40,7 +40,7 @@ def show_images(images: torch.Tensor):
 
 
 def get_transform(type: str):
-    assert type in ['R', 'RTS', 'P', 'E', 'T', 'TU']
+    assert type in ['R', 'RTS', 'P', 'E', None]
 
     if type == 'R':
         transform = transforms.RandomRotation(90)
@@ -63,17 +63,42 @@ def get_transform(type: str):
     elif type == 'E':
         # TODO:
         pass
-    elif type == 'T':
-        padding = (84 - 28) // 2
-        shift = (84 - 28) / (84 * 2)
-
-        transform = transforms.Compose([
-            transforms.Pad(padding=padding),
-            transforms.RandomAffine(degrees=0,
-                                    translate=(shift, shift))
-        ])
     else:
-        # TODO:
-        pass
+        # for transform (T) and (TU)
+        transform = transforms.Lambda(lambda img: np.array(img))
 
     return transform
+
+
+def compute_iou(bbox_1, bbox_2):
+    x_min_1, y_min_1, x_max_1, y_max_1 = bbox_1
+    x_min_2, y_min_2, x_max_2, y_max_2 = bbox_2
+
+    assert x_min_1 < x_max_1
+    assert y_min_1 < y_max_1
+    assert x_min_2 < x_max_2
+    assert y_min_2 < y_max_2
+
+    x_min = max(x_min_1, x_min_2)
+    y_min = max(y_min_1, y_min_2)
+    x_max = min(x_max_1, x_max_2)
+    y_max = min(y_max_1, y_max_2)
+
+    overlap = max(0.0, x_max - x_min) * max(0.0, y_max - y_min)
+    area_1 = (x_max_1 - x_min_1) * (y_max_1 - y_min_1)
+    area_2 = (x_max_2 - x_min_2) * (y_max_2 - y_min_2)
+
+    iou = overlap / (area_1 + area_2 - overlap)
+
+    return iou
+
+
+if __name__ == "__main__":
+    bbox_1 = 0, 0, 10, 10
+    bbox_2 = 5, 5, 15, 15
+
+    # overlap = 25
+    # area_1 = area_2 = 100
+
+    if compute_iou(bbox_1, bbox_2) == 25 / (100 + 100 - 25):
+        print('testing `compute_iou` successfully')

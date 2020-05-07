@@ -1,10 +1,19 @@
 import abc
+import cv2
 import numpy as np
 
 import torch
 from torch.utils.data import Dataset
+from torchvision.transforms import ToTensor
+from albumentations import Compose, BboxParams, PadIfNeeded, ShiftScaleRotate
 
 from utils import prepare_mnist, get_transform, show_images
+
+__all__ = [
+    'DistortedMNIST',
+    'MNISTAddition',
+    'CoLocalisationMNIST'
+]
 
 
 class BaseMNIST(Dataset, abc.ABC):
@@ -66,24 +75,57 @@ class MNISTAddition(BaseMNIST):
         return image, label
 
 
-class CoLocalisationMNIST(Dataset):
+class CoLocalisationMNIST(BaseMNIST):
 
-    def __init__(self, digit, mode='train', transform='T', test_split=0.3):
-        assert 0 <= digit <= 9
-        
-        super(CoLocalisationMNIST, self).__init__(mode, transform, test_split)
+    def __init__(self, mode='train', test_split=0.3):
+        super(CoLocalisationMNIST, self).__init__(mode, None, test_split)
 
     def __getitem__(self, idx):
-        return self.mnist[idx]
+        image, label = self.mnist[idx]
+
+        annotations = {
+            'image': image,
+            'bboxes': [[0.0, 0.0, 28, 28]],  # [x_min, y_min, x_max, y_max]
+            'category_id': [label]
+        }
+
+        transform = Compose([
+            PadIfNeeded(min_height=84,
+                        min_width=84,
+                        border_mode=cv2.BORDER_CONSTANT,
+                        value=0,
+                        p=1.0),
+            ShiftScaleRotate(shift_limit=1 / 3.,
+                             scale_limit=0.0,
+                             rotate_limit=0.0,
+                             border_mode=cv2.BORDER_CONSTANT,
+                             value=0,
+                             interpolation=cv2.INTER_NEAREST,
+                             p=1.0),
+        ],
+            bbox_params=BboxParams(format='pascal_voc',
+                                   label_fields=['category_id'])
+        )
+
+        augmented = transform(**annotations)
+
+        image = ToTensor()(augmented['image'])  # (1, 84, 84)
+        bbox = torch.Tensor(augmented['bboxes'][0])  # (4,)
+
+        return image, bbox, label
 
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-    dataset = MNISTAddition(mode='train', test_split=0.3)
-    dataloader = DataLoader(dataset, batch_size=36)
+    dataset = CoLocalisationMNIST(mode='train', test_split=0.3)
+    dataloader = DataLoader(dataset, batch_size=4)
 
-    for img, label in dataloader:
-        print(img.size())
-        show_images(img)
+    for imgs, bboxes, labels in dataloader:
+        print(imgs.size())
+        print(bboxes.size())
+        print(bboxes)
+        print(labels.size())
+        print(labels)
+        show_images(imgs)
         break
