@@ -1,35 +1,29 @@
 import abc
-import cv2
 import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-from torchvision.transforms import ToTensor
-from albumentations import Compose, BboxParams, PadIfNeeded, ShiftScaleRotate
+from torchvision import transforms
 
-from utils import prepare_mnist, get_transform, show_images
-
-__all__ = [
-    'DistortedMNIST',
-    'MNISTAddition',
-    'CoLocalisationMNIST'
-]
+from utils import prepare_mnist, get_transforms, show_images
 
 
 class BaseMNIST(Dataset, abc.ABC):
 
-    def __init__(self, mode='train', transform=None, test_split=0.3):
+    def __init__(self, mode='train', transform_type=None, test_split=0.3):
         assert mode in ['train', 'val', 'test']
+        super(BaseMNIST, self).__init__()
 
-        _train = (mode in ['train', 'val'])
-        
+        train = mode in ['train', 'val']
+
         self.mode = mode
-        self.mnist = prepare_mnist(train=_train,
-                                   transform=get_transform(type=transform))
+        self.pre_transform, self.post_transform, self.cluster_transform = get_transforms(type=transform_type)
+        self.mnist = prepare_mnist(train=train,
+                                   transform=self.pre_transform)
 
         index_list = list(range(len(self.mnist)))
-
-        if _train:
+        
+        if train:
             split = int(len(self.mnist) * (1 - test_split))
 
             if self.mode == 'train':
@@ -47,15 +41,21 @@ class BaseMNIST(Dataset, abc.ABC):
         pass
 
 
-class DistortedMNIST(Dataset):
+class DistortedMNIST(BaseMNIST):
 
-    def __init__(self, mode='train', transform='R', test_split=0.3):
-        assert transform in ['R', 'RTS', 'P', 'E']
-
-        super(DistortedMNIST, self).__init__(mode, transform, test_split)
+    def __init__(self, mode='train', transform_type='R', test_split=0.3):
+        assert transform_type in ['R', 'RTS', 'P', 'E']
+        super(DistortedMNIST, self).__init__(mode, transform_type, test_split)
 
     def __getitem__(self, idx):
-        return self.mnist[idx]
+        image, label = self.mnist[idx]
+
+        if self.post_transform:
+            augmented = self.post_transform(image=image)
+            image = augmented['image']
+            image = transforms.ToTensor()(image)
+
+        return image, label
 
 
 class MNISTAddition(BaseMNIST):
@@ -64,12 +64,12 @@ class MNISTAddition(BaseMNIST):
         super(MNISTAddition, self).__init__(mode, 'RTS', test_split)
 
     def __getitem__(self, idx):
-        _idx = np.random.choice(self.index_list)
+        random_idx = np.random.choice(self.index_list)
 
         image_1, label_1 = self.mnist[idx]
-        image_2, label_2 = self.mnist[_idx]
+        image_2, label_2 = self.mnist[random_idx]
 
-        image = torch.cat([image_1, image_2], dim=0)
+        image = torch.cat([image_1, image_2], dim=0)  # (2, 42, 42)
         label = label_1 + label_2
 
         return image, label
@@ -77,40 +77,31 @@ class MNISTAddition(BaseMNIST):
 
 class CoLocalisationMNIST(BaseMNIST):
 
-    def __init__(self, mode='train', test_split=0.3):
-        super(CoLocalisationMNIST, self).__init__(mode, None, test_split)
+    def __init__(self, mode='train', transform_type='T', test_split=0.3):
+        assert transform_type in ['T', 'TU']
+        super(CoLocalisationMNIST, self).__init__(mode, transform_type, test_split)
 
     def __getitem__(self, idx):
         image, label = self.mnist[idx]
 
-        annotations = {
-            'image': image,
-            'bboxes': [[0.0, 0.0, 28, 28]],  # [x_min, y_min, x_max, y_max]
-            'category_id': [label]
-        }
+        bboxes = [[0.0, 0.0, 28, 28]]  # [x_min, y_min, x_max, y_max]
+        category_id = [label]
+        augmented = self.post_transform(image=image, bboxes=bboxes, category_id=category_id)
+        image = augmented['image']
+        bbox = augmented['bboxes'][0]
 
-        transform = Compose([
-            PadIfNeeded(min_height=84,
-                        min_width=84,
-                        border_mode=cv2.BORDER_CONSTANT,
-                        value=0,
-                        p=1.0),
-            ShiftScaleRotate(shift_limit=1 / 3.,
-                             scale_limit=0.0,
-                             rotate_limit=0.0,
-                             border_mode=cv2.BORDER_CONSTANT,
-                             value=0,
-                             interpolation=cv2.INTER_NEAREST,
-                             p=1.0),
-        ],
-            bbox_params=BboxParams(format='pascal_voc',
-                                   label_fields=['category_id'])
-        )
+        if self.cluster_transform:
+            random_idx = np.random.choice(self.index_list)
+            random_image, _ = self.mnist[random_idx]
+            
+            for _ in range(16):
+                augmented = self.cluster_transform(image=random_image)
+                random_crop = augmented['image']
+                image += random_crop
 
-        augmented = transform(**annotations)
-
-        image = ToTensor()(augmented['image'])  # (1, 84, 84)
-        bbox = torch.Tensor(augmented['bboxes'][0])  # (4,)
+        image[image > 255] = 255
+        image = transforms.ToTensor()(image)  # (1, 84, 84)
+        bbox = torch.tensor(bbox)  # (4,)  # [x_min, y_min, x_max, y_max]
 
         return image, bbox, label
 
@@ -118,14 +109,24 @@ class CoLocalisationMNIST(BaseMNIST):
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-    dataset = CoLocalisationMNIST(mode='train', test_split=0.3)
-    dataloader = DataLoader(dataset, batch_size=4)
+    dataset = DistortedMNIST(mode='train', transform_type='E', test_split=0.3)
+    dataloader = DataLoader(dataset, batch_size=64)
+
+    for imgs, labels in dataloader:
+        print('images:', imgs.size())
+        print('labels:', labels.size())
+        print(labels)
+        show_images(imgs)
+        break
+    
+    dataset = CoLocalisationMNIST(mode='train', transform_type='TU', test_split=0.3)
+    dataloader = DataLoader(dataset, batch_size=64)
 
     for imgs, bboxes, labels in dataloader:
-        print(imgs.size())
-        print(bboxes.size())
+        print('images:', imgs.size())
+        print('bboxes:', bboxes.size())
         print(bboxes)
-        print(labels.size())
+        print('labels:', labels.size())
         print(labels)
         show_images(imgs)
         break
