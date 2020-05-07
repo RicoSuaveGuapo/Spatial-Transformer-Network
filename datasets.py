@@ -18,8 +18,7 @@ class BaseMNIST(Dataset, abc.ABC):
 
         self.mode = mode
         self.pre_transform, self.post_transform, self.cluster_transform = get_transforms(type=transform_type)
-        self.mnist = prepare_mnist(train=train,
-                                   transform=self.pre_transform)
+        self.mnist = prepare_mnist(train=train, transform=self.pre_transform)
 
         index_list = list(range(len(self.mnist)))
         
