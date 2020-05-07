@@ -44,7 +44,7 @@ def show_images(images: torch.Tensor):
 
 
 def get_transforms(type: str):
-    assert type in ['R', 'RTS', 'P', 'E', 'T', 'TU', None]
+    assert type in ['R', 'RTS', 'P', 'E', 'T', 'TU']
 
     if type in ['T', 'TU']:
         pre_transform = transforms.Lambda(lambda img: np.array(img))
