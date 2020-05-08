@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     # try to show transformed images
     dataset = DistortedMNIST(mode='train', transform_type='E', val_split=0.3)
-    dataloader = DataLoader(dataset, batch_size=36)
+    dataloader = DataLoader(dataset, batch_size=64)
 
     for imgs, labels in dataloader:
         print('images:', imgs.size())
@@ -152,7 +152,7 @@ if __name__ == "__main__":
         break
 
     dataset = MNISTAddition(mode='train', val_split=0.3)
-    dataloader = DataLoader(dataset, batch_size=36)
+    dataloader = DataLoader(dataset, batch_size=64)
 
     for imgs, labels in dataloader:
         print('images:', imgs.size())
