@@ -11,7 +11,16 @@ from transforms import get_transforms
 
 class BaseMNIST(Dataset, abc.ABC):
 
-    def __init__(self, mode='train', transform_type=None, test_split=0.3):
+    def __init__(self, mode='train', transform_type=None, val_split=0.3, seed=42):
+        """Base class for three MNIST tasks
+
+        Keyword Arguments:
+            mode {str} -- initialize dataset for training, validation, or test (default: {'train'})
+            transform_type {str} -- one of 'R', 'RTS', 'P', 'E', 'T', or 'TU' (default: {None})
+            val_split {float} -- ratio for validation (default: {0.3})
+            seed {int} -- seed for generating the same training or validation dataset (default: {42})
+        """
+
         assert mode in ['train', 'val', 'test']
         super(BaseMNIST, self).__init__()
 
@@ -21,10 +30,12 @@ class BaseMNIST(Dataset, abc.ABC):
         self.pre_transform, self.post_transform, self.cluster_transform = get_transforms(type=transform_type)
         self.mnist = prepare_mnist(train=train, transform=self.pre_transform)
 
+        np.random.seed(seed)
         index_list = list(range(len(self.mnist)))
+        index_list = np.random.permutation(index_list)
         
         if train:
-            split = int(len(self.mnist) * (1 - test_split))
+            split = int(len(self.mnist) * (1 - val_split))
 
             if self.mode == 'train':
                 self.index_list = index_list[:split]
@@ -43,9 +54,9 @@ class BaseMNIST(Dataset, abc.ABC):
 
 class DistortedMNIST(BaseMNIST):
 
-    def __init__(self, mode='train', transform_type='R', test_split=0.3):
+    def __init__(self, mode='train', transform_type='R', val_split=0.3, seed=42):
         assert transform_type in ['R', 'RTS', 'P', 'E']
-        super(DistortedMNIST, self).__init__(mode, transform_type, test_split)
+        super(DistortedMNIST, self).__init__(mode, transform_type, val_split, seed)
 
     def __getitem__(self, idx):
         image, label = self.mnist[idx]
@@ -67,8 +78,8 @@ class DistortedMNIST(BaseMNIST):
 
 class MNISTAddition(BaseMNIST):
 
-    def __init__(self, mode='train', test_split=0.3):
-        super(MNISTAddition, self).__init__(mode, 'RTS', test_split)
+    def __init__(self, mode='train', val_split=0.3, seed=42):
+        super(MNISTAddition, self).__init__(mode, 'RTS', val_split, seed)
 
     def __getitem__(self, idx):
         random_idx = np.random.choice(self.index_list)
@@ -84,9 +95,9 @@ class MNISTAddition(BaseMNIST):
 
 class CoLocalisationMNIST(BaseMNIST):
 
-    def __init__(self, mode='train', transform_type='T', test_split=0.3):
+    def __init__(self, mode='train', transform_type='T', val_split=0.3, seed=42):
         assert transform_type in ['T', 'TU']
-        super(CoLocalisationMNIST, self).__init__(mode, transform_type, test_split)
+        super(CoLocalisationMNIST, self).__init__(mode, transform_type, val_split, seed)
 
     def __getitem__(self, idx):
         image, label = self.mnist[idx]
@@ -116,7 +127,21 @@ class CoLocalisationMNIST(BaseMNIST):
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-    dataset = DistortedMNIST(mode='train', transform_type='E', test_split=0.3)
+    # test whether splitting is correct or not
+    seed = 42
+    train_dataset = CoLocalisationMNIST(mode='train', transform_type='T', val_split=0.3, seed=seed)
+    val_dataset = CoLocalisationMNIST(mode='val', transform_type='T', val_split=0.3, seed=seed)
+    
+    overlap_index = set(train_dataset.index_list) & set(val_dataset.index_list)
+
+    if overlap_index:
+        print('overlap index:', overlap_index)
+        raise ValueError('Some wrong when splitting training and validation datasets')
+    else:
+        print('Splitting training and validation datasets successfully')
+
+    # try to show transformed images
+    dataset = DistortedMNIST(mode='train', transform_type='E', val_split=0.3)
     dataloader = DataLoader(dataset, batch_size=36)
 
     for imgs, labels in dataloader:
@@ -126,7 +151,7 @@ if __name__ == "__main__":
         show_images(imgs)
         break
 
-    dataset = MNISTAddition(mode='train', test_split=0.3)
+    dataset = MNISTAddition(mode='train', val_split=0.3)
     dataloader = DataLoader(dataset, batch_size=36)
 
     for imgs, labels in dataloader:
@@ -136,7 +161,7 @@ if __name__ == "__main__":
         show_images(imgs)
         break
     
-    dataset = CoLocalisationMNIST(mode='train', transform_type='TU', test_split=0.3)
+    dataset = CoLocalisationMNIST(mode='train', transform_type='TU', val_split=0.3)
     dataloader = DataLoader(dataset, batch_size=64)
 
     for imgs, bboxes, labels in dataloader:

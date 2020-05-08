@@ -5,7 +5,7 @@ from torchvision import transforms
 import albumentations as albu
 
 
-def pil_2_array(image):
+def pil2array(image):
     return np.array(image)
 
 
@@ -27,7 +27,7 @@ def get_transforms(type: str):
     assert type in ['R', 'RTS', 'P', 'E', 'T', 'TU']
 
     if type in ['T', 'TU']:
-        pre_transform = transforms.Lambda(lambd=pil_2_array)
+        pre_transform = transforms.Lambda(lambd=pil2array)
 
         post_transform = albu.Compose([
             albu.PadIfNeeded(min_height=84,
@@ -65,7 +65,8 @@ def get_transforms(type: str):
 
     if type == 'R':
         pre_transform = transforms.Compose([
-            transforms.RandomRotation(degrees=90, fill=(0,)),
+            transforms.RandomRotation(degrees=90),  # if a bug appears at here
+            # transforms.RandomRotation(degrees=90, fill=(0,)),  # use this function instead
             transforms.ToTensor()
         ])
 
@@ -78,8 +79,8 @@ def get_transforms(type: str):
             transforms.Pad(padding=padding),
             transforms.RandomAffine(degrees=45,  # randomly rotate
                                     translate=(shift, shift),  # randomly place
-                                    scale=(0.7, 1.2),
-                                    fillcolor=0),  # random scaling
+                                    scale=(0.7, 1.2),  # random scaling
+                                    fillcolor=0),
             transforms.ToTensor(),
         ])
 
@@ -90,7 +91,7 @@ def get_transforms(type: str):
                                     translate=None,
                                     scale=(0.75, 1.0),
                                     fillcolor=0),
-            transforms.Lambda(lambd=pil_2_array)
+            transforms.Lambda(lambd=pil2array)
         ])
 
         post_transform = project_transform
@@ -100,7 +101,7 @@ def get_transforms(type: str):
                                     translate=None,
                                     scale=(0.75, 1.0),
                                     fillcolor=0),
-            transforms.Lambda(lambd=pil_2_array)
+            transforms.Lambda(lambd=pil2array)
         ])
 
         # TODO: need to tune the parameters

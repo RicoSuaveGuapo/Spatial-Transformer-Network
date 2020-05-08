@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
-from torchvision import transforms
 from torchvision.datasets import MNIST
+from torchvision.utils import make_grid
 
 
 def prepare_mnist(train, transform):
@@ -16,27 +16,16 @@ def prepare_mnist(train, transform):
 
 
 def show_images(images: torch.Tensor):
-    assert images.ndim == 4
+    assert images.ndim == 4, 'only accept batch images'
 
-    c = images.size(1)
+    bz, c, h, w = images.size()
 
-    if c == 1:
-        imgs = [transforms.ToPILImage()(img) for img in images]
-    if c == 2:
-        imgs = []
-        for img_pair in images:
-            imgs += [transforms.ToPILImage()(img) for img in img_pair]
-
-    n_img = len(imgs)
-    ncols = int(np.sqrt(n_img))
-    nrows = np.ceil(n_img / ncols)
-    plt.figure(figsize=(6, 6))
-
-    for i, img in enumerate(imgs):
-        plt.subplot(nrows, ncols, i + 1)
-        plt.axis('off')
-        plt.imshow(img, cmap='gray')
-
+    images = images.view(bz * c, 1, h, w)
+    images = make_grid(images, pad_value=255)
+    images = images.numpy()
+    images = np.transpose(images, (1, 2, 0))
+    plt.imshow(images, cmap='gray')
+    plt.axis('off')
     plt.show()
 
 
