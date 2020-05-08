@@ -5,7 +5,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from utils import prepare_mnist, get_transforms, show_images
+from utils import prepare_mnist, show_images
+from transforms import get_transforms
 
 
 class BaseMNIST(Dataset, abc.ABC):
@@ -51,7 +52,14 @@ class DistortedMNIST(BaseMNIST):
 
         if self.post_transform:
             augmented = self.post_transform(image=image)
-            image = augmented['image']
+
+            if isinstance(augmented, dict):
+                # transformation of albumentations
+                image = augmented['image']
+            else:
+                # custom transformation
+                image = augmented
+
             image = transforms.ToTensor()(image)
 
         return image, label
@@ -109,7 +117,17 @@ if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
     dataset = DistortedMNIST(mode='train', transform_type='E', test_split=0.3)
-    dataloader = DataLoader(dataset, batch_size=64)
+    dataloader = DataLoader(dataset, batch_size=36)
+
+    for imgs, labels in dataloader:
+        print('images:', imgs.size())
+        print('labels:', labels.size())
+        print(labels)
+        show_images(imgs)
+        break
+
+    dataset = MNISTAddition(mode='train', test_split=0.3)
+    dataloader = DataLoader(dataset, batch_size=36)
 
     for imgs, labels in dataloader:
         print('images:', imgs.size())
