@@ -71,8 +71,6 @@ class DistortedMNIST(BaseMNIST):
                 # custom transformation
                 image = augmented
 
-            image = transforms.ToTensor()(image)
-
         return image, label
 
 
