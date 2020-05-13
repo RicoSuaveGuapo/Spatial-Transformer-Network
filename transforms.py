@@ -3,10 +3,16 @@ import numpy as np
 
 from torchvision import transforms
 import albumentations as albu
+from albumentations.pytorch import ToTensorV2
 
 
 def pil2array(image):
-    return np.array(image)
+    image = np.array(image)
+
+    if image.ndim != 3:
+        image = np.expand_dims(image, axis=-1)
+
+    return image
 
 
 def project_transform(image):
@@ -47,7 +53,7 @@ def get_transforms(type: str):
         )
 
         cluster_transform = None if type != 'TU' else albu.Compose([
-            albu.RandomCrop(height=6, width=6, ),
+            albu.RandomCrop(height=6, width=6),
             albu.PadIfNeeded(min_height=84,
                              min_width=84,
                              border_mode=cv2.BORDER_CONSTANT,
@@ -91,10 +97,12 @@ def get_transforms(type: str):
                                     translate=None,
                                     scale=(0.75, 1.0),
                                     fillcolor=0),
-            transforms.Lambda(lambd=pil2array)
+            transforms.Lambda(lambd=pil2array),
+            transforms.Lambda(lambd=project_transform),
+            transforms.ToTensor()
         ])
 
-        post_transform = project_transform
+        post_transform = None
     elif type == 'E':
         pre_transform = transforms.Compose([
             transforms.RandomAffine(degrees=0.0,
@@ -105,11 +113,14 @@ def get_transforms(type: str):
         ])
 
         # TODO: need to tune the parameters
-        post_transform = albu.ElasticTransform(alpha=0.0,
-                                               sigma=1.5,
-                                               alpha_affine=3.0,
-                                               border_mode=cv2.BORDER_CONSTANT,
-                                               value=0,
-                                               p=1.0)
-    
+        post_transform = albu.Compose([
+            albu.ElasticTransform(alpha=0.0,
+                                  sigma=1.5,
+                                  alpha_affine=3.0,
+                                  border_mode=cv2.BORDER_CONSTANT,
+                                  value=0,
+                                  p=1.0),
+            ToTensorV2()
+        ])
+        
     return pre_transform, post_transform, None
