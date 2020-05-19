@@ -158,10 +158,21 @@ class Base_stn(nn.Module):
         if self.model_name == 'ST-CNN':
             output = self.conv_loc(input)
             output = output.view(output.size(0), -1)
-            theta = self.fc_loc(output)
+            theta = self.fc_loc(output) #(N, self.fc_outdim)
             #theta = theta.view(-1, self.theta_row , self.theta_col)
-            theta = torch.Tensor([ [ [math.cos(i), math.sin(i), 0], [math.cos(i), -math.sin(i), 0] ] for i in theta ])
+            # for only R transformation case
+            #theta = torch.Tensor([ [ [math.cos(i), -math.sin(i), 0], [math.sin(i), math.cos(i), 0] ] for i in theta ])
+            theta = theta.unsqueeze(-1) # (N, 1, 1)
+            cos_matrix = torch.tensor([[1., 0, 0],
+                                        [0, 1., 0]], requires_grad=True) # (2,3)
+            sin_matrix = torch.tensor([[0, -1., 0],
+                                        [1., 0, 0]], requires_grad=True) # (2,3)
             
+            cos_matrix = cos_matrix.unsqueeze(0) # (1,2,3)
+            sin_matrix = sin_matrix.unsqueeze(0) # (1,2,3)
+            theta = torch.cos(theta) * cos_matrix + torch.sin(theta) * sin_matrix
+            print(theta.size())
+
             # grid generator
             if self.trans_type == 'Aff':
                 grid = F.affine_grid(theta, input.size(), align_corners=False)
@@ -220,7 +231,7 @@ if __name__ == '__main__':
     out = stn(img)
     print("Output from stn:", out.size())
 
-    out_np = out.numpy().reshape(28,28)
+    out_np = out.detach().numpy().reshape(28,28)
 
     f, axarr = plt.subplots(1,2)
     axarr[0].imshow(img_np, cmap='gray')
