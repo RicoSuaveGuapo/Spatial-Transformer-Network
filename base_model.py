@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from utils import count_params
 
 
-class Base_cnn_model(nn.Module):
+class BaseCnnModel(nn.Module):
     def __init__(self, input_length:int, input_ch:int=1, conv1_out_fea:int=32, conv2_out_fea:int=64):
         super().__init__()
         
@@ -43,7 +43,7 @@ class Base_cnn_model(nn.Module):
         return count_params(self)
 
 
-class Base_fcn_model(nn.Module):
+class BaseFcnModel(nn.Module):
     def __init__(self, input_length:int, input_ch:int=1, fc1_unit:int=128, fc2_unit:int=256):
         super().__init__()
         # the number of unit should be around 128~256
@@ -74,9 +74,9 @@ class Base_fcn_model(nn.Module):
         return count_params(self)
 
 
-class Base_stn(nn.Module):
+class BaseStn(nn.Module):
     def __init__(self, model_name:str, input_ch:int, input_length:int,
-                conv1_kernal:int = 5, conv2_kernal:int = 5, conv1_outdim:int = 20,
+                conv1_kernel:int = 5, conv2_kernel:int = 5, conv1_outdim:int = 20,
                 conv2_outdim:int = 20, theta_row:int=2, theta_col:int=3, fc_outdim:int=1,
                 fc1_outdim:int = 32, fc2_outdim:int = 32, fc3_outdim:int = 1, trans_type:str = 'Aff'
                 ):
@@ -88,8 +88,8 @@ class Base_stn(nn.Module):
             input_length {int} -- the input object length
 
         Keyword Arguments:
-            conv1_kernal {int} -- kernal size of convolution layer 1 (default: {5})
-            conv2_kernal {int} -- kernal size of convolution layer 2 (default: {5})
+            conv1_kernel {int} -- kernel size of convolution layer 1 (default: {5})
+            conv2_kernel {int} -- kernel size of convolution layer 2 (default: {5})
             conv1_outdim {int} -- the output dim of convolution layer 1 (default: {20})
             conv2_outdim {int} -- the output dim of convolution layer 2 (default: {20})
             theta_row {int} -- the row count of parameters of the transformation (default: {2})
@@ -116,13 +116,13 @@ class Base_stn(nn.Module):
 
         self.input_ch = input_ch
         self.input_length= input_length
-        self.conv1_kernal = conv1_kernal
-        self.conv2_kernal = conv2_kernal
+        self.conv1_kernel = conv1_kernel
+        self.conv2_kernel = conv2_kernel
         self.conv1_outdim = conv1_outdim
         self.conv2_outdim = conv2_outdim 
 
-        self.conv_out_dim = self.conv2_outdim*((((self.input_length - self.conv1_kernal)+1)//2 - 
-                            self.conv2_kernal)+1)**2
+        self.conv_out_dim = self.conv2_outdim*((((self.input_length - self.conv1_kernel)+1)//2 - 
+                            self.conv2_kernel)+1)**2
         self.theta_row = theta_row
         self.theta_col = theta_col
         self.fc_outdim = fc_outdim
@@ -135,10 +135,10 @@ class Base_stn(nn.Module):
         # For ST-CNN
         if model_name == 'ST-CNN':
             self.conv_loc = nn.Sequential(
-                nn.Conv2d(self.input_ch, self.conv1_outdim, self.conv1_kernal),     # (20, 24, 24)
+                nn.Conv2d(self.input_ch, self.conv1_outdim, self.conv1_kernel),     # (20, 24, 24)
                 nn.MaxPool2d(2),                                                    # (20, 12, 12)
                 nn.ReLU(),
-                nn.Conv2d(self.conv1_outdim, self.conv2_outdim, self.conv2_kernal), # (20, 8, 8)
+                nn.Conv2d(self.conv1_outdim, self.conv2_outdim, self.conv2_kernel), # (20, 8, 8)
                 nn.ReLU()
                 )
             self.fc_loc = nn.Linear(self.conv_out_dim, self.fc_outdim)               # (6)
@@ -159,20 +159,21 @@ class Base_stn(nn.Module):
             output = self.conv_loc(input)
             output = output.view(output.size(0), -1)
             theta = self.fc_loc(output) #(N, self.fc_outdim)
+            
+            # 1. for general affine
             #theta = theta.view(-1, self.theta_row , self.theta_col)
-            # for only R transformation case
-            #theta = torch.Tensor([ [ [math.cos(i), -math.sin(i), 0], [math.sin(i), math.cos(i), 0] ] for i in theta ])
+
+            # 2. for only R transformation case
             theta = theta.unsqueeze(-1) # (N, 1, 1)
             cos_matrix = torch.tensor([[1., 0, 0],
-                                        [0, 1., 0]], requires_grad=True) # (2,3)
+                                        [0, 1., 0]], requires_grad=False) # (2,3)
             sin_matrix = torch.tensor([[0, -1., 0],
-                                        [1., 0, 0]], requires_grad=True) # (2,3)
+                                        [1., 0, 0]], requires_grad=False) # (2,3)
             
             cos_matrix = cos_matrix.unsqueeze(0) # (1,2,3)
             sin_matrix = sin_matrix.unsqueeze(0) # (1,2,3)
             theta = torch.cos(theta) * cos_matrix + torch.sin(theta) * sin_matrix
-            print(theta.size())
-
+            
             # grid generator
             if self.trans_type == 'Aff':
                 grid = F.affine_grid(theta, input.size(), align_corners=False)
@@ -205,15 +206,15 @@ if __name__ == '__main__':
     #--test image
     #rand_img = torch.randn(1,1,28,28)
     #print(rand_img)
-    #stn = Base_stn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
     #out = stn(rand_img)
     #print("Output from stn:", out.size())
     
-    #cnn = Base_cnn_model(input_length=rand_img.size(2))
+    #cnn = BaseCnnModel(input_length=rand_img.size(2))
     #out = cnn(rand_img)
     #print("Output from CNN:", out.size())
 
-    #fcn = Base_fcn_model(input_length=rand_img.size(2))
+    #fcn = BaseFcnModel(input_length=rand_img.size(2))
     #out = fcn(rand_img)
     #print("Output from FCN:", out.size())
     
@@ -227,7 +228,7 @@ if __name__ == '__main__':
     img, _ = dataset[idk]
     img_np = np.array(img)
     img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
-    stn = Base_stn(model_name='ST-CNN', input_ch=img.size(1) , input_length=img.size(2))
+    stn = BaseStn(model_name='ST-CNN', input_ch=img.size(1) , input_length=img.size(2))
     out = stn(img)
     print("Output from stn:", out.size())
 

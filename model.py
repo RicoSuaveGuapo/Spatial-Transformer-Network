@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from base_model import Base_cnn_model, Base_fcn_model, Base_stn
+from base_model import BaseCnnModel, BaseFcnModel, BaseStn
 
-class Cnn_model(nn.Module):
+class CnnModel(nn.Module):
     #TODO the number of filiters are b/t 32~64
     def __init__(self):
         super().__init__()
@@ -29,7 +29,7 @@ class Cnn_model(nn.Module):
         return output
 
 
-class Fcn_model(nn.Module):
+class FcnModel(nn.Module):
     #TODO the number of units per layer are 128~256
     def __init__(self):
         super().__init__()
@@ -51,14 +51,14 @@ class Fcn_model(nn.Module):
         return output
 
 
-class St_cnn_model(Base_cnn_model, Base_stn):
+class StCnnModel(nn.Module):
     def __init__(self, base_stn, base_nn_model):
         super().__init__()
         self.base_stn = base_stn
         self.base_nn_model = base_nn_model
         
     def forward(self, input):
-        output = self.base_stn(input)       # (N,28,28)
+        output = self.base_stn(input)       # (N, 28, 28)
         output = self.base_nn_model(output) # (N, 10)
 
         return output
@@ -69,9 +69,9 @@ class St_cnn_model(Base_cnn_model, Base_stn):
 if __name__ == '__main__':
     rand_img = torch.randn(10,1,28,28)
 
-    stn = Base_stn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
-    base_cnn = Base_cnn_model(input_length=rand_img.size(2))
+    stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    base_cnn = BaseCnnModel(input_length=rand_img.size(2))
 
-    st_cnn = St_cnn_model(stn, base_cnn)
+    st_cnn = StCnnModel(base_stn = stn, base_nn_model = base_cnn)
     output = st_cnn(rand_img)
     print(output.size())
