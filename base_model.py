@@ -1,9 +1,15 @@
+import numpy as np
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from utils import count_params
+
+
 class Base_cnn_model(nn.Module):
-    def __init__(self, input_ch:int=1, input_length:int, conv1_out_fea:int=32, conv2_out_fea:int=64):
+    def __init__(self, input_length:int, input_ch:int=1, conv1_out_fea:int=32, conv2_out_fea:int=64):
         super().__init__()
         
         # the number of filters shold be around 32~64
@@ -13,9 +19,6 @@ class Base_cnn_model(nn.Module):
         self.conv1_out_fea = conv1_out_fea
         self.conv2_out_fea = conv2_out_fea
 
-        # the number of learnable parameter should be around 400,000
-        assert 399500 <= self.num_para() <= 400500, 'number of parameters should around 400k'
-
         self.conv1 = nn.Conv2d(input_ch, self.conv1_out_fea, 9) # (self.conv1_out_fea, input_length-9+1, same)
         self.pool1 = nn.MaxPool2d(2) # (self.conv1_out_fea, (input_length-9+1)//2, same)
         self.act   = nn.ReLU()
@@ -23,6 +26,8 @@ class Base_cnn_model(nn.Module):
         self.pool2 = nn.MaxPool2d(2) # (self.conv2_out_fea, ((input_length-9+1)//2-7+1)//2, same)
         self.cls = nn.Linear(self.conv2_out_fea * (((input_length-9+1)//2-7+1)//2)**2, 10)
 
+        #TODO the number of learnable parameter should be around 400,000
+        #assert 399500 <= self.num_params() <= 400500, 'number of parameters should around 400k'
     
     def forward(self, input):
         output = self.act(self.pool1(self.conv1(input)))
@@ -34,13 +39,12 @@ class Base_cnn_model(nn.Module):
 
         return output
 
-    def num_para(self):
-        cnn_para = (9*9*self.conv1_out_fea) + (7*7*self.conv2_out_fea) + (10)
-        return int(cnn_para)
+    def num_params(self):
+        return count_params(self)
 
 
 class Base_fcn_model(nn.Module):
-    def __init__(self, input_ch:int=1, input_length:int, fc1_unit:int=128, fc2_unit:int=256):
+    def __init__(self, input_length:int, input_ch:int=1, fc1_unit:int=128, fc2_unit:int=256):
         super().__init__()
         # the number of unit should be around 128~256
         assert 128 <= fc1_unit <= 256, 'number of unit in fc1 should around 128~256'
@@ -49,12 +53,13 @@ class Base_fcn_model(nn.Module):
         self.fc1_unit = fc1_unit
         self.fc2_unit = fc2_unit
         
-        assert 399500 <= self.num_para() <= 400500, 'number of parameters should around 400k'
-
         self.fc1 = nn.Linear(input_ch*input_length*input_length, self.fc1_unit)
         self.act = nn.ReLU()
         self.fc2 = nn.Linear(self.fc1_unit, self.fc2_unit)
         self.cls = nn.Linear(self.fc2_unit, 10)
+
+        #TODO
+        #assert 399500 <= self.num_params() <= 400500, 'number of parameters should around 400k'
 
     def forward(self, input):
 
@@ -65,17 +70,43 @@ class Base_fcn_model(nn.Module):
         output = F.softmax(output, dim=1)
         return output
 
-    def num_para(self):
-        fcn_para = self.fc1_unit + self.fc2_unit
-        return int(fcn_para)
+    def num_params(self):
+        return count_params(self)
 
 
 class Base_stn(nn.Module):
-    def __init__(self, model_name:str, input_ch:int, input_dim:int,
+    def __init__(self, model_name:str, input_ch:int, input_length:int,
                 conv1_kernal:int = 5, conv2_kernal:int = 5, conv1_outdim:int = 20,
-                conv2_outdim:int = 20, theta_row:int=2, theta_col:int=3, fc_outdim:int=20,
-                fc1_outdim:int = 32, fc2_outdim:int = 32, fc3_outdim:int = 32, trans_type:str = 'Aff'
+                conv2_outdim:int = 20, theta_row:int=2, theta_col:int=3, fc_outdim:int=1,
+                fc1_outdim:int = 32, fc2_outdim:int = 32, fc3_outdim:int = 1, trans_type:str = 'Aff'
                 ):
+        """The base STN 
+
+        Arguments:
+            model_name {str} -- ST-CNN or ST-FCN
+            input_ch {int} -- the input object channel
+            input_length {int} -- the input object length
+
+        Keyword Arguments:
+            conv1_kernal {int} -- kernal size of convolution layer 1 (default: {5})
+            conv2_kernal {int} -- kernal size of convolution layer 2 (default: {5})
+            conv1_outdim {int} -- the output dim of convolution layer 1 (default: {20})
+            conv2_outdim {int} -- the output dim of convolution layer 2 (default: {20})
+            theta_row {int} -- the row count of parameters of the transformation (default: {2})
+            theta_col {int} -- the col count of parameters of the transformation (default: {3})
+            fc_outdim {int} -- the output dim of the last layer in ST for ST-CNN (default: {6})
+            #TODO note that fc_outdim for affine transformation is 6, however for more advance 
+            transformation must need 20 parameters.
+
+            fc1_outdim {int} -- the output dim of fully connected layer 1 (default: {32})
+            fc2_outdim {int} -- the output dim of fully connected layer 2 (default: {32})
+            fc3_outdim {int} -- the output dim of fully connected layer 3 (default: {6})
+            #TODO 
+
+            trans_type {str} -- the type of transformation (default: {'Aff'})
+        """
+
+
         assert model_name in ['ST-CNN', 'ST-FCN'], "model name must be either ST-CNN or ST-FCN"
         assert trans_type in ['Aff','Proj','TPS'], 'transformation_type must be one of Aff, Proj, TPS'
         
@@ -84,14 +115,14 @@ class Base_stn(nn.Module):
         self.trans_type = trans_type
 
         self.input_ch = input_ch
-        self.input_dim= input_dim
+        self.input_length= input_length
         self.conv1_kernal = conv1_kernal
         self.conv2_kernal = conv2_kernal
         self.conv1_outdim = conv1_outdim
         self.conv2_outdim = conv2_outdim 
 
-        self.conv_out_dim = (((self.input_dim - self.conv1_kernal)+1)//2 - 
-                            self.conv2_kernal)+1
+        self.conv_out_dim = self.conv2_outdim*((((self.input_length - self.conv1_kernal)+1)//2 - 
+                            self.conv2_kernal)+1)**2
         self.theta_row = theta_row
         self.theta_col = theta_col
         self.fc_outdim = fc_outdim
@@ -103,14 +134,14 @@ class Base_stn(nn.Module):
         # --localisation networks --
         # For ST-CNN
         if model_name == 'ST-CNN':
-            self.con_loc = nn.Sequential(
+            self.conv_loc = nn.Sequential(
                 nn.Conv2d(self.input_ch, self.conv1_outdim, self.conv1_kernal),     # (20, 24, 24)
                 nn.MaxPool2d(2),                                                    # (20, 12, 12)
                 nn.ReLU(),
-                nn.Conv2d(self.conv1_outdimi, self.conv2_outdim, self.conv2_kernal), # (20, 8, 8)
+                nn.Conv2d(self.conv1_outdim, self.conv2_outdim, self.conv2_kernal), # (20, 8, 8)
                 nn.ReLU()
                 )
-            self.fc_loc = nn.Linear(self.conv_out_dim, self.fc_outdim)               # (20)
+            self.fc_loc = nn.Linear(self.conv_out_dim, self.fc_outdim)               # (6)
         
         # For ST-FCN
         else:
@@ -119,7 +150,7 @@ class Base_stn(nn.Module):
                 nn.ReLU(),
                 nn.Linear(self.fc1_outdim, self.fc2_outdim),                         # (32)
                 nn.ReLU(),
-                nn.Linear(self.fc2_outdim, self.fc3_outdim)                          # (32)
+                nn.Linear(self.fc2_outdim, self.fc3_outdim)                          # (6)
                 )
 
 
@@ -128,12 +159,13 @@ class Base_stn(nn.Module):
             output = self.conv_loc(input)
             output = output.view(output.size(0), -1)
             theta = self.fc_loc(output)
-            theta = theta.view(-1, self.theta_row , self.theta_col)
+            #theta = theta.view(-1, self.theta_row , self.theta_col)
+            theta = torch.Tensor([ [ [math.cos(i), math.sin(i), 0], [math.cos(i), -math.sin(i), 0] ] for i in theta ])
             
             # grid generator
             if self.trans_type == 'Aff':
-                grid = F.affine_grid(theta, input.size())
-                grid_sample = F.grid_sample(input, grid)
+                grid = F.affine_grid(theta, input.size(), align_corners=False)
+                grid_sample = F.grid_sample(input, grid, align_corners=False, padding_mode="border", mode='bilinear')
             
                 return grid_sample
 
@@ -150,19 +182,49 @@ class Base_stn(nn.Module):
             theta = theta.view(-1, self.theta_row , self.theta_col)
             
             # grid generator
-            grid = F.affine_grid(theta, input.size())
-            grid_sample = F.grid_sample(input, grid)
+            grid = F.affine_grid(theta, input.size(), align_corners=False)
+            grid_sample = F.grid_sample(input, grid, align_corners=False, padding_mode="border", mode='bilinear')
 
             return grid_sample
 
-    def num_para(self):
-        #TODO
-        pass
+    def num_params(self):
+        return count_params(self)
 
-if __name__ == '__main__()':
-    import torch
+if __name__ == '__main__':
+    #--test image
+    #rand_img = torch.randn(1,1,28,28)
+    #print(rand_img)
+    #stn = Base_stn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    #out = stn(rand_img)
+    #print("Output from stn:", out.size())
+    
+    #cnn = Base_cnn_model(input_length=rand_img.size(2))
+    #out = cnn(rand_img)
+    #print("Output from CNN:", out.size())
 
-    cnn = Base_cnn_model()
-    rand_img = torch.randn(10,1,28,28)
-    out = cnn(rand_img)
-    print(out.size())
+    #fcn = Base_fcn_model(input_length=rand_img.size(2))
+    #out = fcn(rand_img)
+    #print("Output from FCN:", out.size())
+    
+    #--real image
+    from torchvision.datasets import MNIST
+    from matplotlib import pyplot as plt
+
+    filepath = '/home/jarvis1121/AI/Rico_Repo/data'
+    dataset = MNIST(root=filepath, train=True)
+    idk = 5
+    img, _ = dataset[idk]
+    img_np = np.array(img)
+    img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
+    stn = Base_stn(model_name='ST-CNN', input_ch=img.size(1) , input_length=img.size(2))
+    out = stn(img)
+    print("Output from stn:", out.size())
+
+    out_np = out.numpy().reshape(28,28)
+
+    f, axarr = plt.subplots(1,2)
+    axarr[0].imshow(img_np, cmap='gray')
+    axarr[1].imshow(out_np, cmap='gray')
+
+    plt.show()
+    

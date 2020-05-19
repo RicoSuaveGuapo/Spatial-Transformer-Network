@@ -52,6 +52,10 @@ def compute_iou(bbox_1, bbox_2):
     return iou
 
 
+def count_params(model):
+    return sum(p.numel() for p in model.parameters())
+
+
 if __name__ == "__main__":
     bbox_1 = 0, 0, 10, 10
     bbox_2 = 5, 5, 15, 15
