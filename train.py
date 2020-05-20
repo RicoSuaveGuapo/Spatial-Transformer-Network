@@ -176,7 +176,7 @@ def main():
     # train
     print('\n-------- Starting Training --------\n')
 
-    for epoch in range(1): #TODO paper use 150*1000 iterations ~ 769 epoch in batc_size = 256
+    for epoch in range(2): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -212,6 +212,7 @@ def main():
         with torch.no_grad():
             val_run_loss = 0.0
             print('---Validaion Loop begins---')
+            batch_count = 0
             for i, data in enumerate(val_dataloader, start=0):
                 input, target = data[0].to(device), data[1].to(device)
 
@@ -219,10 +220,10 @@ def main():
                 loss = criterion(output, target)
 
                 val_run_loss += loss.item()
-                if i % 10 == 9:
-                    print(
-                    f"[{epoch+1}, {i+1}]: %.3f" % (train_running_loss/10)
-                )
+                batch_count += 1
+                
+            val_run_loss = val_run_loss/batch_count
+            print(f"[{epoch+1}]: %.3f" % (val_run_loss))
                 
             print('---Validaion Loop ends---')
 
