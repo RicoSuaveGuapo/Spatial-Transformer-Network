@@ -35,7 +35,9 @@ class BaseCnnModel(nn.Module):
         output = output.view(output.size(0), -1)
         output = self.cls(output)
 
-        output = F.softmax(output, dim=1)
+        # since nn.CrossEntropy wiil do the softmax at first
+        # we only need logit output here
+        #output = F.softmax(output, dim=1)
 
         return output
 
@@ -67,7 +69,7 @@ class BaseFcnModel(nn.Module):
         output = self.act(self.fc1(input))
         output = self.cls(self.fc2(output))
 
-        output = F.softmax(output, dim=1)
+        #output = F.softmax(output, dim=1)
         return output
 
     def num_params(self):
@@ -125,6 +127,11 @@ class BaseStn(nn.Module):
                             self.conv2_kernel)+1)**2
         self.theta_row = theta_row
         self.theta_col = theta_col
+        self.register_buffer('cos_matrix', torch.tensor([[1., 0, 0],
+                                                         [0, 1., 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
+        self.register_buffer('sin_matrix', torch.tensor([[0, -1., 0],
+                                                         [1., 0, 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
+
         self.fc_outdim = fc_outdim
 
         self.fc1_outdim = fc1_outdim
@@ -165,14 +172,8 @@ class BaseStn(nn.Module):
 
             # 2. for only R transformation case
             theta = theta.unsqueeze(-1) # (N, 1, 1)
-            cos_matrix = torch.tensor([[1., 0, 0],
-                                        [0, 1., 0]], requires_grad=False) # (2,3)
-            sin_matrix = torch.tensor([[0, -1., 0],
-                                        [1., 0, 0]], requires_grad=False) # (2,3)
-            
-            cos_matrix = cos_matrix.unsqueeze(0) # (1,2,3)
-            sin_matrix = sin_matrix.unsqueeze(0) # (1,2,3)
-            theta = torch.cos(theta) * cos_matrix + torch.sin(theta) * sin_matrix
+                        
+            theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
             
             # grid generator
             if self.trans_type == 'Aff':
@@ -195,15 +196,8 @@ class BaseStn(nn.Module):
 
             # 2. for only R transformation case
             theta = theta.unsqueeze(-1) # (N, 1, 1)
-            cos_matrix = torch.tensor([[1., 0, 0],
-                                        [0, 1., 0]], requires_grad=False) # (2,3)
-            sin_matrix = torch.tensor([[0, -1., 0],
-                                        [1., 0, 0]], requires_grad=False) # (2,3)
             
-            cos_matrix = cos_matrix.unsqueeze(0) # (1,2,3)
-            sin_matrix = sin_matrix.unsqueeze(0) # (1,2,3)
-            theta = torch.cos(theta) * cos_matrix + torch.sin(theta) * sin_matrix
-            
+            theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
             
             # grid generator
             grid = F.affine_grid(theta, input.size(), align_corners=False)
@@ -235,7 +229,9 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
 
     filepath = '/home/jarvis1121/AI/Rico_Repo/data'
-    dataset = MNIST(root=filepath, train=True)
+    dataset = MNIST(root=filepath, train=False)
+    #print(len(dataset)) # 60k for train, 10k for test
+    
     idk = 5
     img, _ = dataset[idk]
     img_np = np.array(img)

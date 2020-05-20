@@ -24,7 +24,7 @@ class CnnModel(nn.Module):
         output = output.view(output.size(0), -1)
         output = self.cls(output)
 
-        output = F.softmax(output, dim=1)
+        #output = F.softmax(output, dim=1)
 
         return output
 
@@ -46,7 +46,7 @@ class FcnModel(nn.Module):
         output = self.act(self.fc1(input))
         output = self.cls(self.fc2(output))
 
-        output = F.softmax(output, dim=1)
+        #output = F.softmax(output, dim=1)
 
         return output
 
