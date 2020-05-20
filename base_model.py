@@ -146,7 +146,7 @@ class BaseStn(nn.Module):
         # For ST-FCN
         else:
             self.fc_loc = nn.Sequential(
-                nn.Linear(self.input_ch*self.input_dim**2, self.fc1_outdim),         # (32)
+                nn.Linear(self.input_ch*self.input_length**2, self.fc1_outdim),         # (32)
                 nn.ReLU(),
                 nn.Linear(self.fc1_outdim, self.fc2_outdim),                         # (32)
                 nn.ReLU(),
@@ -189,9 +189,21 @@ class BaseStn(nn.Module):
                 pass
 
         else:
-            input = input.view(input(0),-1)
-            theta = self.fc_loc(input)
-            theta = theta.view(-1, self.theta_row , self.theta_col)
+            theta = self.fc_loc(input.view(input.size(0),-1))
+            # 1. for general affine
+            #theta = theta.view(-1, self.theta_row , self.theta_col)
+
+            # 2. for only R transformation case
+            theta = theta.unsqueeze(-1) # (N, 1, 1)
+            cos_matrix = torch.tensor([[1., 0, 0],
+                                        [0, 1., 0]], requires_grad=False) # (2,3)
+            sin_matrix = torch.tensor([[0, -1., 0],
+                                        [1., 0, 0]], requires_grad=False) # (2,3)
+            
+            cos_matrix = cos_matrix.unsqueeze(0) # (1,2,3)
+            sin_matrix = sin_matrix.unsqueeze(0) # (1,2,3)
+            theta = torch.cos(theta) * cos_matrix + torch.sin(theta) * sin_matrix
+            
             
             # grid generator
             grid = F.affine_grid(theta, input.size(), align_corners=False)

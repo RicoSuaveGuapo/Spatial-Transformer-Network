@@ -51,7 +51,7 @@ class FcnModel(nn.Module):
         return output
 
 
-class StCnnModel(nn.Module):
+class StModel(nn.Module):
     def __init__(self, base_stn, base_nn_model):
         super().__init__()
         self.base_stn = base_stn
@@ -64,14 +64,12 @@ class StCnnModel(nn.Module):
         return output
 
 
-
-
 if __name__ == '__main__':
-    rand_img = torch.randn(10,1,28,28)
+    rand_img = torch.randn(11,1,28,28)
 
-    stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
-    base_cnn = BaseCnnModel(input_length=rand_img.size(2))
+    stn = BaseStn(model_name='ST-FCN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    base_fcn = BaseFcnModel(input_length=rand_img.size(2))
 
-    st_cnn = StCnnModel(base_stn = stn, base_nn_model = base_cnn)
-    output = st_cnn(rand_img)
+    st_fcn = StModel(base_stn = stn, base_nn_model = base_fcn)
+    output = st_fcn(rand_img)
     print(output.size())
