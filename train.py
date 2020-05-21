@@ -14,8 +14,10 @@ from base_model import BaseCnnModel, BaseFcnModel, BaseStn
 from model import CnnModel, FcnModel, StModel
 
 
-#TODO tensorboard 視覺化 ST module 的梯度，確保梯度有正常傳到 ST module，
-# 並且每訓練一段時間就秀出 transformed images，以及秀出 loss accuracy 等等
+#TODO 
+# 1. tensorboard 視覺化 ST module 的梯度，目的是確保梯度有正常傳到 ST module，
+# 2. 每訓練一段時間就秀出 transformed images
+# 3. 可以在 train loop 加上 writer.add_images 秀出 transform 前後的比對圖
 
 def build_argparse():
     parser = argparse.ArgumentParser()
@@ -98,8 +100,7 @@ def main():
             model = model.to(device)
             
             criterion = nn.CrossEntropyLoss()
-            # pass to CUDA device
-            #criterion.to(device)
+                        
 
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
@@ -179,7 +180,7 @@ def main():
     # prepare the tensorboard
     writer = SummaryWriter(f'runs/trial_{args.exp}')
 
-    for epoch in range(10): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
+    for epoch in range(3): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -211,6 +212,12 @@ def main():
                 )
         print('---Training Loop ends---')
         
+        # the transformed image though ST, after one epoch
+        with torch.no_grad():
+            origi_img = input[:4,...].clone().detach() #(N, C, H, W)
+            trans_img = stn(origi_img) #(N, C, H, W)
+            writer.add_image(f"Transformed Images in epoch_{epoch+1}", trans_img, dataformats='NCHW')
+            writer.add_image(f"Original Images in epoch_{epoch+1}", origi_img, dataformats='NCHW')
         
         # VALIDATION LOOP
         with torch.no_grad():
@@ -260,13 +267,13 @@ def main():
 if __name__ == '__main__':
     main()
     
-    parser = build_argparse()
-    args = parser.parse_args()
+    #parser = build_argparse()
+    #args = parser.parse_args()
 
-    stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
-    base_cnn = BaseCnnModel(input_length=args.input_length)
-    model = StModel(base_stn = stn, base_nn_model = base_cnn)
+    #stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
+    #base_cnn = BaseCnnModel(input_length=args.input_length)
+    #model = StModel(base_stn = stn, base_nn_model = base_cnn)
 
-    path = '/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/1_DistortedMNIST_R_ST-CNN.pth'
-    model.load_state_dict(torch.load(path))
+    #path = '/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/1_DistortedMNIST_R_ST-CNN.pth'
+    #model.load_state_dict(torch.load(path))
 

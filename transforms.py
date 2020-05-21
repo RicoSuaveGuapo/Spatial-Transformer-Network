@@ -6,8 +6,7 @@ import albumentations as albu
 from albumentations.pytorch import ToTensorV2
 
 
-# see https://hackmd.io/njZgW_rWQ6yyG0XL4wjI8g?view&fbclid=IwAR2ZzLbcxF66Kxc92UD7P8okslcBgYy_miYiYltrCXWje4t-hxGNBdzi7eA#Use-with-torchvisiontransforms
-# for the reason of pre_transform and post_transform
+
 
 def pil2array(image):
     image = np.array(image)

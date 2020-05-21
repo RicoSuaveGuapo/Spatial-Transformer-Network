@@ -248,6 +248,7 @@ if __name__ == '__main__':
     idk = 5
     img, _ = dataset[idk]
     img_np = np.array(img)
+    
     img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
     stn = BaseStn(model_name='ST-CNN', input_ch=img.size(1) , input_length=img.size(2))
     out = stn(img)
