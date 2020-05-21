@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from datasets import DistortedMNIST, MNISTAddition, CoLocalisationMNIST
 from base_model import BaseCnnModel, BaseFcnModel, BaseStn
@@ -14,12 +15,12 @@ from model import CnnModel, FcnModel, StModel
 
 
 #TODO tensorboard 視覺化 ST module 的梯度，確保梯度有正常傳到 ST module，
-# 並且每訓練一段時間就秀出 transformed images，已經秀出 loss accuracy 等等
+# 並且每訓練一段時間就秀出 transformed images，以及秀出 loss accuracy 等等
 
 def build_argparse():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--exp', help='The index of this experiment', default=1)
+    parser.add_argument('--exp', help='The index of this experiment', type=int, default=1)
 
     parser.add_argument('--task_type', default='DistortedMNIST')
     parser.add_argument('--model_name', default='ST-CNN')
@@ -175,8 +176,10 @@ def main():
 
     # train
     print('\n-------- Starting Training --------\n')
+    # prepare the tensorboard
+    writer = SummaryWriter(f'runs/trial_{args.exp}')
 
-    for epoch in range(2): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
+    for epoch in range(10): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -196,6 +199,7 @@ def main():
             scheduler.step()
 
             train_running_loss += loss.item()
+            writer.add_scalar('Averaged loss', loss.item(), 196*epoch + i)
             if i % 20 == 19:
                 print(
                     f"[{epoch+1}, {i+1}]: %.3f" % (train_running_loss/20)
@@ -213,20 +217,33 @@ def main():
             val_run_loss = 0.0
             print('---Validaion Loop begins---')
             batch_count = 0
+            total_count = 0
+            correct_count = 0
             for i, data in enumerate(val_dataloader, start=0):
                 input, target = data[0].to(device), data[1].to(device)
 
                 output = model(input)
                 loss = criterion(output, target)
 
+                _, predicted = torch.max(output, 1)
+
                 val_run_loss += loss.item()
                 batch_count += 1
-                
+                total_count += target.size(0)
+
+                correct_count += (predicted == target).sum().item()
+            
+            accuracy = (100 * correct_count/total_count)
             val_run_loss = val_run_loss/batch_count
-            print(f"[{epoch+1}]: %.3f" % (val_run_loss))
+            
+            writer.add_scalar('Validation accuracy', accuracy, epoch)
+            writer.add_scalar('Validation loss', val_run_loss, epoch)
+
+            print(f"Loss of {epoch+1} epoch is %.3f" % (val_run_loss))
+            print(f"Accuracy is {accuracy} %")
                 
             print('---Validaion Loop ends---')
-
+    writer.close()
     print('\n-------- End Training --------\n')
     
 
@@ -237,5 +254,19 @@ def main():
         
     print('\n-------- Saved --------\n')
 
+#----------------------
+# 10 epoch ~ 1m, accuracy 86.6%
+#----------------------
 if __name__ == '__main__':
     main()
+    
+    parser = build_argparse()
+    args = parser.parse_args()
+
+    stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
+    base_cnn = BaseCnnModel(input_length=args.input_length)
+    model = StModel(base_stn = stn, base_nn_model = base_cnn)
+
+    path = '/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/1_DistortedMNIST_R_ST-CNN.pth'
+    model.load_state_dict(torch.load(path))
+

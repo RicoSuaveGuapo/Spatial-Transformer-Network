@@ -198,7 +198,7 @@ class BaseStn(nn.Module):
             theta = theta.unsqueeze(-1) # (N, 1, 1)
             
             theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
-            
+
             # grid generator
             grid = F.affine_grid(theta, input.size(), align_corners=False)
             grid_sample = F.grid_sample(input, grid, align_corners=False, padding_mode="border", mode='bilinear')
@@ -207,6 +207,19 @@ class BaseStn(nn.Module):
 
     def num_params(self):
         return count_params(self)
+
+total_grad_out = []
+total_grad_in = []
+def hook_fn_backward(module, grad_input, grad_output):
+    print(module)
+    print('grad_output', grad_output)
+    print('grad_input', grad_input)
+    
+    total_grad_in.append(grad_input)
+    total_grad_out.append(grad_output)
+
+
+
 
 if __name__ == '__main__':
     #--test image

@@ -67,9 +67,15 @@ class StModel(nn.Module):
 if __name__ == '__main__':
     rand_img = torch.randn(11,1,28,28)
 
-    stn = BaseStn(model_name='ST-FCN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
-    base_fcn = BaseFcnModel(input_length=rand_img.size(2))
+    #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    #base_fcn = BaseFcnModel(input_length=rand_img.size(2))
 
-    st_fcn = StModel(base_stn = stn, base_nn_model = base_fcn)
-    output = st_fcn(rand_img)
-    print(output.size())
+    #st_fcn = StModel(base_stn = stn, base_nn_model = base_fcn)
+    #output = st_fcn(rand_img)
+    #print(output.size())
+
+    model = FcnModel()
+    modules = model.named_children()
+    for name, module in modules:
+        print("Module name:" ,name)
+        print("Module" ,module)
