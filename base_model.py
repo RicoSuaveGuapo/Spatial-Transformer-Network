@@ -207,16 +207,11 @@ class BaseStn(nn.Module):
 
     def num_params(self):
         return count_params(self)
-
-total_grad_out = []
-total_grad_in = []
-def hook_fn_backward(module, grad_input, grad_output):
-    print(module)
-    print('grad_output', grad_output)
-    print('grad_input', grad_input)
     
-    total_grad_in.append(grad_input)
-    total_grad_out.append(grad_output)
+    # to record ST ggradient
+    def hook_fn_backward(module, grad_input, grad_output):
+        #？＠？
+        pass
 
 
 
@@ -238,27 +233,39 @@ if __name__ == '__main__':
     #print("Output from FCN:", out.size())
     
     #--real image
-    from torchvision.datasets import MNIST
-    from matplotlib import pyplot as plt
+    #from torchvision.datasets import MNIST
+    #from matplotlib import pyplot as plt
 
-    filepath = '/home/jarvis1121/AI/Rico_Repo/data'
-    dataset = MNIST(root=filepath, train=False)
+    #filepath = '/home/jarvis1121/AI/Rico_Repo/data'
+    #dataset = MNIST(root=filepath, train=False)
     #print(len(dataset)) # 60k for train, 10k for test
     
-    idk = 5
-    img, _ = dataset[idk]
-    img_np = np.array(img)
+    #idk = 5
+    #img, _ = dataset[idk]
+    #img_np = np.array(img)
+
+    #img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
+    #stn = BaseStn(model_name='ST-CNN', input_ch=1 , input_length=28)
+    #out = stn(img)
+    #print("Output from stn:", out.size())
+
+    #out_np = out.detach().numpy().reshape(28,28)
+
+    #f, axarr = plt.subplots(1,2)
+    #axarr[0].imshow(img_np, cmap='gray')
+    #axarr[1].imshow(out_np, cmap='gray')
+
+    #plt.show()
     
-    img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
-    stn = BaseStn(model_name='ST-CNN', input_ch=img.size(1) , input_length=img.size(2))
-    out = stn(img)
-    print("Output from stn:", out.size())
+    #modules = stn.named_children()
+    #for name, module in modules:
+    #    if name == 'conv_loc':
+     #       module.register_backward_hook(hook_fn_backward)
 
-    out_np = out.detach().numpy().reshape(28,28)
 
-    f, axarr = plt.subplots(1,2)
-    axarr[0].imshow(img_np, cmap='gray')
-    axarr[1].imshow(out_np, cmap='gray')
+    #output = stn(rand_img)
+    #output = output.
+    #output.backward()
 
-    plt.show()
-    
+    #print(grad_in)
+    pass

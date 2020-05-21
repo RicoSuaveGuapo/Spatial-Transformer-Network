@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torchvision.utils import make_grid
 
 from datasets import DistortedMNIST, MNISTAddition, CoLocalisationMNIST
 from base_model import BaseCnnModel, BaseFcnModel, BaseStn
@@ -69,6 +70,8 @@ def build_scheduler(optimizer):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda = lambdaAll)
     return scheduler
 
+  
+
 
 def main():
     # device
@@ -99,6 +102,14 @@ def main():
             # pass to CUDA device
             model = model.to(device)
             
+            # ST gradient register
+            modules = model.named_children()
+            for name, module in modules:
+                if name == 'base_stn':
+                    module.register_backward_hook(hook_fn_backward)
+            # grad_in is what we want.
+
+
             criterion = nn.CrossEntropyLoss()
                         
 
@@ -180,7 +191,7 @@ def main():
     # prepare the tensorboard
     writer = SummaryWriter(f'runs/trial_{args.exp}')
 
-    for epoch in range(3): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
+    for epoch in range(10): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -212,12 +223,21 @@ def main():
                 )
         print('---Training Loop ends---')
         
-        # the transformed image though ST, after one epoch
+        # 1. catch the transformed image though ST, after one epoch
+        # 2. catch the ST backward gradient
         with torch.no_grad():
-            origi_img = input[:4,...].clone().detach() #(N, C, H, W)
-            trans_img = stn(origi_img) #(N, C, H, W)
-            writer.add_image(f"Transformed Images in epoch_{epoch+1}", trans_img, dataformats='NCHW')
-            writer.add_image(f"Original Images in epoch_{epoch+1}", origi_img, dataformats='NCHW')
+            # 1.
+            # number of images to show
+            n = 6
+            origi_img = input[:n,...].clone().detach() #(4, C, H, W)
+            trans_img = stn(origi_img) #(4, C, H, W)
+            img = torch.cat((origi_img,trans_img), dim=0) #(4+4, C, H, W)
+            img = make_grid(img, nrow=n)
+            writer.add_image(f"Original-Up, ST-Down images in epoch_{epoch+1}", img)
+            
+            # 2.
+            
+
         
         # VALIDATION LOOP
         with torch.no_grad():
@@ -260,20 +280,34 @@ def main():
     torch.save(model.state_dict(), savepath)
         
     print('\n-------- Saved --------\n')
+    print(f'\n== Trial {args.exp} finished ==\n')
 
 #----------------------
 # 10 epoch ~ 1m, accuracy 86.6%
 #----------------------
 if __name__ == '__main__':
     main()
-    
-    #parser = build_argparse()
-    #args = parser.parse_args()
+    #grad_in = []
+    #def hook_fn_backward(module, grad_input, grad_output):
+    #    return grad_input
 
-    #stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
-    #base_cnn = BaseCnnModel(input_length=args.input_length)
+    #stn = BaseStn(model_name='ST-CNN', input_ch=1 , input_length=28)
+    #base_cnn = BaseCnnModel(input_length=28)
     #model = StModel(base_stn = stn, base_nn_model = base_cnn)
 
-    #path = '/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/1_DistortedMNIST_R_ST-CNN.pth'
-    #model.load_state_dict(torch.load(path))
+    #modules = model.named_children()
+    #for name, module in modules:
+    #    if name == 'base_stn':
+    #        module.register_backward_hook(hook_fn_backward)
 
+    #dataset = DistortedMNIST(mode='train', transform_type='R', val_split=0.1, seed=42)
+    #dataloader = DataLoader(dataset,batch_size=10)
+    
+    #image, label = next(iter(dataloader))
+
+    #output = model(image)
+    #criterion = nn.CrossEntropyLoss()
+    #loss = criterion(output, label)
+    #loss.backward()
+
+    #print(grad_input)
