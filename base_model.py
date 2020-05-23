@@ -67,9 +67,8 @@ class BaseFcnModel(nn.Module):
 
         input = input.view(input.size(0), -1)
         output = self.act(self.fc1(input))
-        output = self.cls(self.fc2(output))
+        output = self.cls(self.act(self.fc2(output)))
 
-        #output = F.softmax(output, dim=1)
         return output
 
     def num_params(self):
@@ -208,12 +207,6 @@ class BaseStn(nn.Module):
     def num_params(self):
         return count_params(self)
     
-    # to record ST ggradient
-    def hook_fn_backward(module, grad_input, grad_output):
-        #？＠？
-        pass
-
-
 
 
 if __name__ == '__main__':

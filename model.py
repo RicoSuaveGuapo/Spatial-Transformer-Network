@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 from base_model import BaseCnnModel, BaseFcnModel, BaseStn
 
@@ -56,16 +57,27 @@ class StModel(nn.Module):
         super().__init__()
         self.base_stn = base_stn
         self.base_nn_model = base_nn_model
-        
+
+        self.norm = None
+        self.base_stn.register_backward_hook(self.hook_fn_backward)
+
     def forward(self, input):
         output = self.base_stn(input)       # (N, 28, 28)
         output = self.base_nn_model(output) # (N, 10)
 
         return output
+    
+    # to record ST gradient
+    def hook_fn_backward(self, module, grad_input, grad_output):
+        
+        norm = np.sum(np.sum(grad_input[1].detach().cpu().numpy()**2))
+        print(len(grad_input))
+
+        self.norm = norm
 
 
 if __name__ == '__main__':
-    rand_img = torch.randn(11,1,28,28)
+    #rand_img = torch.randn(11,1,28,28)
 
     #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
     #base_fcn = BaseFcnModel(input_length=rand_img.size(2))

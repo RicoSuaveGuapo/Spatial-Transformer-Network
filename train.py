@@ -24,6 +24,7 @@ def build_argparse():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--exp', help='The index of this experiment', type=int, default=1)
+    parser.add_argument('--epoch', type=int, default = 1)
 
     parser.add_argument('--task_type', default='DistortedMNIST')
     parser.add_argument('--model_name', default='ST-CNN')
@@ -102,16 +103,8 @@ def main():
             # pass to CUDA device
             model = model.to(device)
             
-            # ST gradient register
-            modules = model.named_children()
-            for name, module in modules:
-                if name == 'base_stn':
-                    module.register_backward_hook(hook_fn_backward)
-            # grad_in is what we want.
-
 
             criterion = nn.CrossEntropyLoss()
-                        
 
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
@@ -191,7 +184,7 @@ def main():
     # prepare the tensorboard
     writer = SummaryWriter(f'runs/trial_{args.exp}')
 
-    for epoch in range(10): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
+    for epoch in range(args.epoch): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -212,6 +205,7 @@ def main():
 
             train_running_loss += loss.item()
             writer.add_scalar('Averaged loss', loss.item(), 196*epoch + i)
+            writer.add_scalar('ST Gradients Norm', model.norm, 196*epoch + i)
             if i % 20 == 19:
                 print(
                     f"[{epoch+1}, {i+1}]: %.3f" % (train_running_loss/20)
@@ -223,10 +217,8 @@ def main():
                 )
         print('---Training Loop ends---')
         
-        # 1. catch the transformed image though ST, after one epoch
-        # 2. catch the ST backward gradient
+        # catch the transformed image though ST, after one epoch
         with torch.no_grad():
-            # 1.
             # number of images to show
             n = 6
             origi_img = input[:n,...].clone().detach() #(4, C, H, W)
@@ -234,10 +226,6 @@ def main():
             img = torch.cat((origi_img,trans_img), dim=0) #(4+4, C, H, W)
             img = make_grid(img, nrow=n)
             writer.add_image(f"Original-Up, ST-Down images in epoch_{epoch+1}", img)
-            
-            # 2.
-            
-
         
         # VALIDATION LOOP
         with torch.no_grad():
@@ -287,28 +275,3 @@ def main():
 #----------------------
 if __name__ == '__main__':
     main()
-    #grad_in = []
-    #def hook_fn_backward(module, grad_input, grad_output):
-    #    return grad_input
-
-    #stn = BaseStn(model_name='ST-CNN', input_ch=1 , input_length=28)
-    #base_cnn = BaseCnnModel(input_length=28)
-    #model = StModel(base_stn = stn, base_nn_model = base_cnn)
-
-    #modules = model.named_children()
-    #for name, module in modules:
-    #    if name == 'base_stn':
-    #        module.register_backward_hook(hook_fn_backward)
-
-    #dataset = DistortedMNIST(mode='train', transform_type='R', val_split=0.1, seed=42)
-    #dataloader = DataLoader(dataset,batch_size=10)
-    
-    #image, label = next(iter(dataloader))
-
-    #output = model(image)
-    #criterion = nn.CrossEntropyLoss()
-    #loss = criterion(output, label)
-    #loss.backward()
-
-    #print(grad_input)
-    pass
