@@ -29,10 +29,11 @@ class CAM:
     def _forward(self, img):
         with torch.no_grad():
             features = self.model.base_nn_model.features(img) # (B, c, h', w')
-            logits   = self.model.forward(img) # (B, nclass)
+            logits   = self.model.base_nn_model.logits(features) # (B, nclass)
             probs = F.softmax(logits, dim=-1)
 
         self.features = features.numpy().squeeze()
+        print(self.features.shape)
         self.probs = probs.numpy().squeeze()
 
     def get_class_idx(self, i):
@@ -61,7 +62,7 @@ class CAM:
 
         return heatmap
 
-    def plot_heatmap(self, img, top):
+    def plot_heatmap(self, img, top, gt_label):
         self._forward(img)
         img_numpy = img.numpy().squeeze()
         cols = top + 1 
@@ -71,7 +72,7 @@ class CAM:
 
         for i in range(cols):
             if i == 0:
-                label = self.idx2label(i+1)
+                label = gt_label
 
                 plt.subplot(1, cols, i+1)
                 plt.imshow(img_numpy, alpha=1, cmap='gray')
@@ -94,7 +95,7 @@ class CAM:
 
 
 if __name__ == '__main__':
-    num = 17
+    num = 18
     path = '/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save'+f'/{num}_DistortedMNIST_R_ST-CNN.pth'
     model_st = BaseStn('ST-CNN', 1, 28)
     model_cnn = BaseCnnModel(28, gap=True)
@@ -107,15 +108,9 @@ if __name__ == '__main__':
     test_img_set = DistortedMNIST(mode='test', transform_type='R', seed=42)
     test_img_loader =  DataLoader(test_img_set, batch_size=1, shuffle=True)
     for img, label in test_img_loader:
-        cam.plot_heatmap(img, top=3)
+        cam.plot_heatmap(img, gt_label=label.item(), top=3)
         break
 
-
-
-
-    # print(cam.gen_heatmap().shape)
-    # plt.imshow(cam.gen_heatmap)
-    # plt.show()
 
 
     
