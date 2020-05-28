@@ -66,9 +66,11 @@ def build_train_val_test_dataset(args):
     else:
         #TODO
         pass
+
 def build_scheduler(optimizer):
     lambdaAll = lambda iteration: 0.1 ** (iteration//50000)
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda = lambdaAll)
+    
     return scheduler
 
   
@@ -194,7 +196,8 @@ def main():
         for i, data in enumerate(train_dataloader, start=0): 
             # move CUDA device
             input, target = data[0].to(device), data[1].to(device)
-            
+            # print("input size: ", input.size())
+
             optimizer.zero_grad()
             output = model(input)
             loss = criterion(output, target)
@@ -245,6 +248,7 @@ def main():
                 val_run_loss += loss.item()
                 batch_count += 1
                 total_count += target.size(0)
+                
 
                 correct_count += (predicted == target).sum().item()
             

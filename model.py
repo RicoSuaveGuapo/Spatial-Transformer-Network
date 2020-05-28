@@ -71,7 +71,13 @@ class StModel(nn.Module):
     def hook_fn_backward(self, module, grad_input, grad_output):
         
         norm = np.sum(np.sum(grad_input[1].detach().cpu().numpy()**2))
-        print(len(grad_input))
+        #print(module)
+        # print("grad_input shape: ", len(grad_input))
+        # print("grad_input[0] type: ", type(grad_input[0]))
+        # print("grad_input[1] type: ", type(grad_input[1]))
+        # print("grad_input[1] size(): ", grad_input[1].size())
+        # print("grad_output shape: ", len(grad_output))
+        # print("grad_output[0] size: ", grad_output[0].size())
 
         self.norm = norm
 
