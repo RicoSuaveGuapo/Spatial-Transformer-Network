@@ -6,8 +6,6 @@ import albumentations as albu
 from albumentations.pytorch import ToTensorV2
 
 
-
-
 def pil2array(image):
     image = np.array(image)
 
@@ -18,12 +16,12 @@ def pil2array(image):
 
 
 def project_transform(image):
-    size = (28, 28)
+    size = 28, 28
     mean, std = 0.0, 5.0
 
-    src = np.float32([[0, 0], [0, 28], [28, 0], [28, 28]])
+    src = np.array([[0.0, 0.0], [0.0, 28.0],
+                    [28.0, 0.0], [28.0, 28.0]])
     dst = src + np.random.randn(4, 2) * std + mean
-    dst = dst.astype(np.float32)
 
     M = cv2.getPerspectiveTransform(src, dst)
     image = cv2.warpPerspective(image, M, size)
