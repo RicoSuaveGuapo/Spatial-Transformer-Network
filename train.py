@@ -26,6 +26,8 @@ def build_argparse():
     parser.add_argument('--exp', help='The index of this experiment', type=int, default=1)
     parser.add_argument('--epoch', type=int, default = 1)
 
+    parser.add_argument('--gap', help='for CAM', type=bool, default=False)
+
     parser.add_argument('--task_type', default='DistortedMNIST')
     parser.add_argument('--model_name', default='ST-CNN')
     parser.add_argument('--input_ch', default = 1)
@@ -99,7 +101,7 @@ def main():
     if args.task_type == 'DistortedMNIST':
         if args.model_name == 'ST-CNN':            
             stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
-            base_cnn = BaseCnnModel(input_length=args.input_length)
+            base_cnn = BaseCnnModel(input_length=args.input_length, gap=args.gap)
             model = StModel(base_stn = stn, base_nn_model = base_cnn)
 
             # pass to CUDA device

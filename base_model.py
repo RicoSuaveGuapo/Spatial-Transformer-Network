@@ -9,9 +9,10 @@ from utils import count_params
 
 
 class BaseCnnModel(nn.Module):
-    def __init__(self, input_length:int, input_ch:int=1, conv1_out_fea:int=32, conv2_out_fea:int=64):
+    def __init__(self, input_length:int, input_ch:int=1, conv1_out_fea:int=32, conv2_out_fea:int=64, gap=False):
         super().__init__()
         
+        self.input_length = input_length
         # the number of filters shold be around 32~64
         assert 32<= conv1_out_fea <= 64, 'number of filters in conv1 must in the range of 32~64'
         assert 32<= conv2_out_fea <= 64, 'number of filters in conv1 must in the range of 32~64'
@@ -24,22 +25,45 @@ class BaseCnnModel(nn.Module):
         self.act   = nn.ReLU()
         self.conv2 = nn.Conv2d(self.conv1_out_fea, self.conv2_out_fea, 7) # (self.conv2_out_fea, (input_length-9+1)//2-7+1, same)
         self.pool2 = nn.MaxPool2d(2) # (self.conv2_out_fea, ((input_length-9+1)//2-7+1)//2, same)
-        self.cls = nn.Linear(self.conv2_out_fea * (((input_length-9+1)//2-7+1)//2)**2, 10)
+
+        if gap:
+            self.gap_boolean = gap
+            self.gap = nn.AdaptiveAvgPool2d(1)
+            self.cls = nn.Linear(self.conv2_out_fea, 10)
+        else:    
+            self.cls = nn.Linear(self.conv2_out_fea * (((input_length-9+1)//2-7+1)//2)**2, 10)
+
+
 
         #TODO the number of learnable parameter should be around 400,000
         #assert 399500 <= self.num_params() <= 400500, 'number of parameters should around 400k'
+
+    def features(self, input):
+        x = self.act(self.pool1(self.conv1(input))) # (B, self.conv1_out_fea, (input_length-9+1)//2, same)
+        x = self.pool2(self.conv2(x))          # (B, self.conv2_out_fea, ((input_length-9+1)//2-7+1)//2, same)
+        
+        return x
     
+    def logits(self, features):
+        if self.gap_boolean:
+            x = self.gap(features) # (B, self.conv2_out_fea, 1, 1)
+            x = x.view(x.size(0), -1) # (B, self.conv2_out_fea)
+            x = self.cls(x)
+        else:
+            x = features.view(features.size(0), -1) # (B, self.conv2_out_fea*(((input_length-9+1)//2-7+1)//2)**2 )
+            x = self.cls(x)
+
+        return x
+
     def forward(self, input):
-        output = self.act(self.pool1(self.conv1(input)))
-        output = self.pool2(self.conv2(output))
-        output = output.view(output.size(0), -1)
-        output = self.cls(output)
+        x = self.features(input)
+        x = self.logits(x)
 
         # since nn.CrossEntropy wiil do the softmax at first
         # we only need logit output here
-        #output = F.softmax(output, dim=1)
+        #x = F.softmax(x, dim=1)
 
-        return output
+        return x
 
     def num_params(self):
         return count_params(self)
@@ -211,15 +235,15 @@ class BaseStn(nn.Module):
 
 if __name__ == '__main__':
     #--test image
-    #rand_img = torch.randn(1,1,28,28)
+    rand_img = torch.randn(1,1,28,28)
     #print(rand_img)
     #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
     #out = stn(rand_img)
     #print("Output from stn:", out.size())
     
-    #cnn = BaseCnnModel(input_length=rand_img.size(2))
-    #out = cnn(rand_img)
-    #print("Output from CNN:", out.size())
+    cnn = BaseCnnModel(input_length=rand_img.size(2), gap=True)
+    out = cnn(rand_img)
+    # print("Output from CNN:", out.size())
 
     #fcn = BaseFcnModel(input_length=rand_img.size(2))
     #out = fcn(rand_img)
@@ -261,4 +285,4 @@ if __name__ == '__main__':
     #output.backward()
 
     #print(grad_in)
-    pass
+    # pass
