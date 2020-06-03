@@ -4,3 +4,8 @@ practice_code.py
 St_image
 Figure_1.png
 data
+runs/trial_1/events.out.tfevents.1591160854.jarvis1121-AI-Server.12466.0
+runs/trial_1/events.out.tfevents.1591161014.jarvis1121-AI-Server.12819.0
+runs/trial_1/events.out.tfevents.1591161105.jarvis1121-AI-Server.13124.0
+runs/trial_1/events.out.tfevents.1591161799.jarvis1121-AI-Server.13655.0
+model_save/1_DistortedMNIST_R_ST-CNN.pth
