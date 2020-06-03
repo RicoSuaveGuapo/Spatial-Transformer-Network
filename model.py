@@ -71,29 +71,23 @@ class StModel(nn.Module):
     def hook_fn_backward(self, module, grad_input, grad_output):
         
         norm = np.sum(np.sum(grad_input[1].detach().cpu().numpy()**2))
-        #print(module)
-        # print("grad_input shape: ", len(grad_input))
-        # print("grad_input[0] type: ", type(grad_input[0]))
-        # print("grad_input[1] type: ", type(grad_input[1]))
-        # print("grad_input[1] size(): ", grad_input[1].size())
-        # print("grad_output shape: ", len(grad_output))
-        # print("grad_output[0] size: ", grad_output[0].size())
-
+        
         self.norm = norm
 
 
 if __name__ == '__main__':
-    #rand_img = torch.randn(11,1,28,28)
+    # rand_img = torch.randn(11,1,28,28)
 
-    #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
-    #base_fcn = BaseFcnModel(input_length=rand_img.size(2))
+    # stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    # base_fcn = BaseFcnModel(input_length=rand_img.size(2))
 
-    #st_fcn = StModel(base_stn = stn, base_nn_model = base_fcn)
-    #output = st_fcn(rand_img)
-    #print(output.size())
+    # st_fcn = StModel(base_stn = stn, base_nn_model = base_fcn)
+    # output = st_fcn(rand_img)
+    # print(output.size())
 
-    model = FcnModel()
-    modules = model.named_children()
-    for name, module in modules:
-        print("Module name:" ,name)
-        print("Module" ,module)
+    # model = FcnModel()
+    # modules = model.named_children()
+    # for name, module in modules:
+    #     print("Module name:" ,name)
+    #     print("Module" ,module)
+    pass

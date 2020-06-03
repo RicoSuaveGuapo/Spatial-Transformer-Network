@@ -94,15 +94,16 @@ class BaseFcnModel(nn.Module):
 
 
 class BaseStn(nn.Module):
-    def __init__(self, model_name:str, input_ch:int, input_length:int,
+    def __init__(self, model_name:str, input_ch:int, input_length:int, trans_type:str,
                 conv1_kernel:int = 5, conv2_kernel:int = 5, conv1_outdim:int = 20,
-                conv2_outdim:int = 20, theta_row:int=2, theta_col:int=3, fc_outdim:int=1,
-                fc1_outdim:int = 32, fc2_outdim:int = 32, fc3_outdim:int = 1, trans_type:str = 'Aff'
+                conv2_outdim:int = 20, theta_row:int=2, theta_col:int=3,
+                fc1_outdim:int = 32, fc2_outdim:int = 32, fc3_outdim:int = 1, trans_task:str = 'Aff'
                 ):
         """The base STN 
 
         Arguments:
             model_name {str} -- ST-CNN or ST-FCN
+            trans_type {str} -- ['R', 'RTS', 'P', 'E', 'T', 'TU', None]
             input_ch {int} -- the input object channel
             input_length {int} -- the input object length
 
@@ -113,24 +114,24 @@ class BaseStn(nn.Module):
             conv2_outdim {int} -- the output dim of convolution layer 2 (default: {20})
             theta_row {int} -- the row count of parameters of the transformation (default: {2})
             theta_col {int} -- the col count of parameters of the transformation (default: {3})
-            fc_outdim {int} -- the output dim of the last layer in ST for ST-CNN (default: {6})
-            #TODO note that fc_outdim for affine transformation is 6, however for more advance 
-            transformation must need 20 parameters.
+           
 
             fc1_outdim {int} -- the output dim of fully connected layer 1 (default: {32})
             fc2_outdim {int} -- the output dim of fully connected layer 2 (default: {32})
             fc3_outdim {int} -- the output dim of fully connected layer 3 (default: {6})
             #TODO 
 
-            trans_type {str} -- the type of transformation (default: {'Aff'})
+            trans_task {str} -- the type of transformation (default: {'Aff'})
         """
 
 
-        assert model_name in ['ST-CNN', 'ST-FCN'], "model name must be either ST-CNN or ST-FCN"
-        assert trans_type in ['Aff','Proj','TPS'], 'transformation_type must be one of Aff, Proj, TPS'
+        assert model_name in ['ST-CNN', 'ST-FCN'], 'model name must be either ST-CNN or ST-FCN'
+        assert trans_task in ['Aff','Proj','TPS'], 'trans_task must be one of Aff, Proj, TPS'
+        assert trans_type in ['R', 'RTS', 'P', 'E', 'T', 'TU', None], 'trans_type must be R, RTS, P, E, T, TU, None'
         
         super().__init__()
         self.model_name = model_name
+        self.trans_task = trans_task
         self.trans_type = trans_type
 
         self.input_ch = input_ch
@@ -142,14 +143,21 @@ class BaseStn(nn.Module):
 
         self.conv_out_dim = self.conv2_outdim*((((self.input_length - self.conv1_kernel)+1)//2 - 
                             self.conv2_kernel)+1)**2
+
         self.theta_row = theta_row
         self.theta_col = theta_col
-        self.register_buffer('cos_matrix', torch.tensor([[1., 0, 0],
-                                                         [0, 1., 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
-        self.register_buffer('sin_matrix', torch.tensor([[0, -1., 0],
-                                                         [1., 0, 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
+        
 
-        self.fc_outdim = fc_outdim
+        if trans_type == 'R':
+            self.fc_outdim = 1
+            self.register_buffer('cos_matrix', torch.tensor([[1., 0, 0],
+                                                         [0, 1., 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
+            self.register_buffer('sin_matrix', torch.tensor([[0, -1., 0],
+                                                         [1., 0, 0]], requires_grad=False).unsqueeze(0)) # (1,2,3)
+        elif trans_type == 'RTS':
+            self.fc_outdim = 6
+        else:
+            raise(TypeError)
 
         self.fc1_outdim = fc1_outdim
         self.fc2_outdim = fc2_outdim
@@ -165,16 +173,17 @@ class BaseStn(nn.Module):
                 nn.Conv2d(self.conv1_outdim, self.conv2_outdim, self.conv2_kernel), # (20, 8, 8)
                 nn.ReLU()
                 )
-            self.fc_loc = nn.Linear(self.conv_out_dim, self.fc_outdim)               # (6)
+            self.fc_loc = nn.Linear(self.conv_out_dim, self.fc_outdim)               # (self.fc_outdim)
+            
         
         # For ST-FCN
         else:
             self.fc_loc = nn.Sequential(
-                nn.Linear(self.input_ch*self.input_length**2, self.fc1_outdim),         # (32)
+                nn.Linear(self.input_ch*self.input_length**2, self.fc1_outdim),      # (32)
                 nn.ReLU(),
                 nn.Linear(self.fc1_outdim, self.fc2_outdim),                         # (32)
                 nn.ReLU(),
-                nn.Linear(self.fc2_outdim, self.fc3_outdim)                          # (6)
+                nn.Linear(self.fc2_outdim, self.fc3_outdim)                          # (self.fc_outdim)
                 )
 
 
@@ -184,22 +193,31 @@ class BaseStn(nn.Module):
             output = output.view(output.size(0), -1)
             theta = self.fc_loc(output) #(N, self.fc_outdim)
             
-            # 1. for general affine
-            #theta = theta.view(-1, self.theta_row , self.theta_col)
 
-            # 2. for only R transformation case
-            theta = theta.unsqueeze(-1) # (N, 1, 1)
-                        
-            theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
+            # 1. for only R transformation case
+            if self.trans_type == 'R':
+                theta = theta.unsqueeze(-1) # (N, 1, 1)
+                            
+                theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
             
+            # 2. for general affine
+            elif self.trans_type == 'RTS':
+                theta = theta.view(-1, self.theta_row , self.theta_col) # (N, 2, 3)
+                print(theta)
+
+            else:
+                #TODO
+                pass
+
+
             # grid generator
-            if self.trans_type == 'Aff':
+            if self.trans_task == 'Aff':
                 grid = F.affine_grid(theta, input.size(), align_corners=False)
                 grid_sample = F.grid_sample(input, grid, align_corners=False, padding_mode="border", mode='bilinear')
             
                 return grid_sample
 
-            elif self.trans_type == 'Proj':
+            elif self.trans_task == 'Proj':
                 #TODO
                 pass
             else:
@@ -208,13 +226,19 @@ class BaseStn(nn.Module):
 
         else:
             theta = self.fc_loc(input.view(input.size(0),-1))
-            # 1. for general affine
-            #theta = theta.view(-1, self.theta_row , self.theta_col)
-
-            # 2. for only R transformation case
-            theta = theta.unsqueeze(-1) # (N, 1, 1)
+            # 1. for only R transformation case
+            if self.trans_type == 'R':
+                theta = theta.unsqueeze(-1) # (N, 1, 1)
+                            
+                theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
             
-            theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
+            # 2. for general affine
+            elif self.trans_type == 'RTS':
+                theta = theta.view(-1, self.theta_row , self.theta_col) # (n, 2, 3)
+
+            else:
+                #TODO
+                pass
 
             # grid generator
             grid = F.affine_grid(theta, input.size(), align_corners=False)
@@ -229,14 +253,14 @@ class BaseStn(nn.Module):
 
 if __name__ == '__main__':
     #--test image
-    rand_img = torch.randn(1,1,28,28)
-    #print(rand_img)
-    #stn = BaseStn(model_name='ST-CNN', input_ch=rand_img.size(1) , input_length=rand_img.size(2))
-    #out = stn(rand_img)
-    #print("Output from stn:", out.size())
+    # rand_img = torch.randn(1,1,28,28)
+
+    # stn = BaseStn(model_name='ST-CNN', trans_task = 'Aff', trans_type = 'RTS',input_ch=rand_img.size(1) , input_length=rand_img.size(2))
+    # out = stn(rand_img)
+    # print("Output from stn:", out.size())
     
-    cnn = BaseCnnModel(input_length=rand_img.size(2), gap=True)
-    out = cnn(rand_img)
+    # cnn = BaseCnnModel(input_length=rand_img.size(2), gap=True)
+    # out = cnn(rand_img)
     # print("Output from CNN:", out.size())
 
     #fcn = BaseFcnModel(input_length=rand_img.size(2))
@@ -244,29 +268,29 @@ if __name__ == '__main__':
     #print("Output from FCN:", out.size())
     
     #--real image
-    #from torchvision.datasets import MNIST
-    #from matplotlib import pyplot as plt
+    from torchvision.datasets import MNIST
+    from matplotlib import pyplot as plt
 
-    #filepath = '/home/jarvis1121/AI/Rico_Repo/data'
-    #dataset = MNIST(root=filepath, train=False)
-    #print(len(dataset)) # 60k for train, 10k for test
+    filepath = '/home/jarvis1121/AI/Rico_Repo/data'
+    dataset = MNIST(root=filepath, train=False)
+    # print(len(dataset)) # 60k for train, 10k for test
     
-    #idk = 5
-    #img, _ = dataset[idk]
-    #img_np = np.array(img)
+    idk = 25
+    img, _ = dataset[idk]
+    img_np = np.array(img)
 
-    #img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
-    #stn = BaseStn(model_name='ST-CNN', input_ch=1 , input_length=28)
-    #out = stn(img)
-    #print("Output from stn:", out.size())
+    img = torch.from_numpy(img_np.reshape(1,1,28,28)).float()
+    stn = BaseStn(model_name='ST-CNN', trans_task = 'Aff', trans_type = 'RTS',input_ch=1 , input_length=28)
+    out = stn(img)
+    print("Output from stn:", out.size())
 
-    #out_np = out.detach().numpy().reshape(28,28)
+    out_np = out.detach().numpy().reshape(28,28)
 
-    #f, axarr = plt.subplots(1,2)
-    #axarr[0].imshow(img_np, cmap='gray')
-    #axarr[1].imshow(out_np, cmap='gray')
+    f, axarr = plt.subplots(1,2)
+    axarr[0].imshow(img_np, cmap='gray')
+    axarr[1].imshow(out_np, cmap='gray')
 
-    #plt.show()
+    plt.show()
     
     #modules = stn.named_children()
     #for name, module in modules:

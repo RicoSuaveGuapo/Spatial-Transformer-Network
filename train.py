@@ -26,8 +26,8 @@ def build_argparse():
     parser.add_argument('--task_type', default='DistortedMNIST')
     parser.add_argument('--model_name', default='ST-CNN')
     parser.add_argument('--input_ch', default = 1)
-    parser.add_argument('--input_length', default = 28)
-    parser.add_argument('--transform_type', default='R')
+    parser.add_argument('--input_length', default = 28, type=int)
+    parser.add_argument('--trans_type', default='R')
     parser.add_argument('--val_split', type=float, default=1/6)
     parser.add_argument('--seed', type=int, default=42)
 
@@ -39,16 +39,16 @@ def build_argparse():
 
 def check_argparse(args):
     assert args.task_type in ['DistortedMNIST', 'MNISTAddition', 'CoLocalisationMNIST']
-    assert args.transform_type in ['R', 'RTS', 'P', 'E', 'T', 'TU', None]
+    assert args.trans_type in ['R', 'RTS', 'P', 'E', 'T', 'TU', None]
     assert args.model_name in ['CNN','FCN','ST-CNN','ST-FCN']
 
 
 
 def build_train_val_test_dataset(args):
     if args.task_type == 'DistortedMNIST':
-        train_dataset = DistortedMNIST(mode='train', transform_type=args.transform_type, val_split=args.val_split, seed=args.seed)
-        val_dataset   = DistortedMNIST(mode='val', transform_type=args.transform_type, val_split=args.val_split, seed=args.seed)
-        test_dataset   = DistortedMNIST(mode='test', transform_type=args.transform_type, seed=args.seed)
+        train_dataset = DistortedMNIST(mode='train', transform_type=args.trans_type, val_split=args.val_split, seed=args.seed)
+        val_dataset   = DistortedMNIST(mode='val', transform_type=args.trans_type, val_split=args.val_split, seed=args.seed)
+        test_dataset   = DistortedMNIST(mode='test', transform_type=args.trans_type, seed=args.seed)
 
         train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_dataloader   = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
@@ -94,7 +94,7 @@ def main():
     # model
     if args.task_type == 'DistortedMNIST':
         if args.model_name == 'ST-CNN':            
-            stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
+            stn = BaseStn(model_name=args.model_name, trans_type=args.trans_type, input_ch=args.input_ch , input_length=args.input_length)
             base_cnn = BaseCnnModel(input_length=args.input_length, gap=args.gap)
             model = StModel(base_stn = stn, base_nn_model = base_cnn)
 
@@ -107,10 +107,6 @@ def main():
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
             
-
-            # callbacks
-            #filepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/callback/trial_{int(args.exp)}'
-            # https://hackmd.io/l9Kcq74ARcC_qimz5QRM3g
         
         elif args.model_name == 'ST-FCN':
             stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
@@ -121,15 +117,10 @@ def main():
             model = model.to(device)
             
             criterion = nn.CrossEntropyLoss()
-            # pass to CUDA device
-            #criterion.to(device)
 
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
 
-            # callbacks
-            #filepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/callback/trial_{int(args.exp)}'
-            
         
         elif args.model_name == 'CNN':
             model = CnnModel()
@@ -138,15 +129,11 @@ def main():
             model = model.to(device)
             
             criterion = nn.CrossEntropyLoss()
-            # pass to CUDA device
-            #criterion.to(device)
+
 
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
 
-            
-            # callbacks
-            #filepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/callback/trial_{int(args.exp)}'
         else:
             model = FcnModel()
             
@@ -154,16 +141,12 @@ def main():
             model = model.to(device)
             
             criterion = nn.CrossEntropyLoss()
-            # pass to CUDA device
-            #criterion.to(device)
+
 
             optimizer = optim.SGD(model.parameters(), lr=0.01)
             scheduler = build_scheduler(optimizer)
 
 
-            # callbacks
-            #filepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/callback/trial_{int(args.exp)}'            
-    
     elif args.task_type == 'MNISTAddition':
         #TODO
         pass
@@ -182,7 +165,7 @@ def main():
     # prepare the tensorboard
     writer = SummaryWriter(f'runs/trial_{args.exp}')
 
-    for epoch in range(args.epoch): #TODO paper use 150*1000 iterations ~ 769 epoch in batch_size = 256
+    for epoch in range(args.epoch): #TODO paper uses 150*1000 iterations ~ 769 epoch in batch_size = 256
         train_running_loss = 0.0
         print(f'\n---The {epoch+1}-th epoch---\n')
         print('[Epoch, Batch] : Loss')
@@ -264,7 +247,7 @@ def main():
 
     print('\n-------- Saving Model --------\n')
 
-    savepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/{str(args.exp)}_{str(args.task_type)}_{str(args.transform_type)}_{str(args.model_name)}.pth'
+    savepath = f'/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/{str(args.exp)}_{str(args.task_type)}_{str(args.trans_type)}_{str(args.model_name)}.pth'
     torch.save(model.state_dict(), savepath)
         
     print('\n-------- Saved --------\n')
