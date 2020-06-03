@@ -1,5 +1,5 @@
 import numpy as np
-from PIL import Image
+import cv2
 from matplotlib import pyplot as plt
 import numpy
 
@@ -33,7 +33,6 @@ class CAM:
             probs = F.softmax(logits, dim=-1)
 
         self.features = features.numpy().squeeze()
-        print(self.features.shape)
         self.probs = probs.numpy().squeeze()
 
     def get_class_idx(self, i):
@@ -56,8 +55,7 @@ class CAM:
         heatmap = np.sum(weight_cls_i * self.features , axis=0)
         heatmap = (heatmap - np.min(heatmap) )/(np.max(heatmap)- np.min(heatmap))
         heatmap = np.uint8(heatmap * 255)
-        heatmap = Image.fromarray(heatmap)
-        heatmap = heatmap.resize(self.size, Image.ANTIALIAS)
+        heatmap = cv2.resize(heatmap, self.size)
         heatmap = np.array(heatmap)
 
         return heatmap

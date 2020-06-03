@@ -26,13 +26,9 @@ class BaseCnnModel(nn.Module):
         self.conv2 = nn.Conv2d(self.conv1_out_fea, self.conv2_out_fea, 7) # (self.conv2_out_fea, (input_length-9+1)//2-7+1, same)
         self.pool2 = nn.MaxPool2d(2) # (self.conv2_out_fea, ((input_length-9+1)//2-7+1)//2, same)
 
-        if gap:
-            self.gap_boolean = gap
-            self.gap = nn.AdaptiveAvgPool2d(1)
-            self.cls = nn.Linear(self.conv2_out_fea, 10)
-        else:    
-            self.cls = nn.Linear(self.conv2_out_fea * (((input_length-9+1)//2-7+1)//2)**2, 10)
 
+        self.gap = nn.AdaptiveAvgPool2d(1) if gap else None
+        self.cls = nn.Linear(self.conv2_out_fea, 10) if gap else nn.Linear(self.conv2_out_fea * (((input_length-9+1)//2-7+1)//2)**2, 10)
 
 
         #TODO the number of learnable parameter should be around 400,000
@@ -45,13 +41,11 @@ class BaseCnnModel(nn.Module):
         return x
     
     def logits(self, features):
-        if self.gap_boolean:
-            x = self.gap(features) # (B, self.conv2_out_fea, 1, 1)
-            x = x.view(x.size(0), -1) # (B, self.conv2_out_fea)
-            x = self.cls(x)
-        else:
-            x = features.view(features.size(0), -1) # (B, self.conv2_out_fea*(((input_length-9+1)//2-7+1)//2)**2 )
-            x = self.cls(x)
+        x = self.gap(features) if self.gap else features
+        x = x.view(x.size(0), -1)
+        x = self.cls(x)
+
+
 
         return x
 

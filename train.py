@@ -15,11 +15,6 @@ from base_model import BaseCnnModel, BaseFcnModel, BaseStn
 from model import CnnModel, FcnModel, StModel
 
 
-#TODO 
-# 1. tensorboard 視覺化 ST module 的梯度，目的是確保梯度有正常傳到 ST module，
-# 2. 每訓練一段時間就秀出 transformed images
-# 3. 可以在 train loop 加上 writer.add_images 秀出 transform 前後的比對圖
-
 def build_argparse():
     parser = argparse.ArgumentParser()
 
@@ -80,7 +75,6 @@ def build_scheduler(optimizer):
 
 def main():
     # device
-    assert torch.cuda.is_available(), 'It is better to train with GPU'
     device = torch.device('cuda:0' if torch.cuda.is_available() else "cpu")
 
     # args
