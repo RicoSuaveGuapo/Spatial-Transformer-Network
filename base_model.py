@@ -146,6 +146,7 @@ class BaseStn(nn.Module):
 
         self.theta_row = theta_row
         self.theta_col = theta_col
+        self.theta = None
         
 
         if trans_type == 'R':
@@ -203,7 +204,7 @@ class BaseStn(nn.Module):
             # 2. for general affine
             elif self.trans_type == 'RTS':
                 theta = theta.view(-1, self.theta_row , self.theta_col) # (N, 2, 3)
-                print(theta)
+                self.theta = theta
 
             else:
                 #TODO
@@ -248,6 +249,51 @@ class BaseStn(nn.Module):
 
     def num_params(self):
         return count_params(self)
+
+    def gen_theta(self, input):
+        if self.model_name == 'ST-CNN':
+            output = self.conv_loc(input)
+            output = output.view(output.size(0), -1)
+            theta = self.fc_loc(output) #(N, self.fc_outdim)
+            
+
+            # 1. for only R transformation case
+            if self.trans_type == 'R':
+                theta = theta.unsqueeze(-1) # (N, 1, 1)
+                            
+                theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
+            
+            # 2. for general affine
+            elif self.trans_type == 'RTS':
+                theta = theta.view(-1, self.theta_row , self.theta_col) # (N, 2, 3)
+                self.theta = theta
+            
+                return self.theta
+            else:
+                #TODO
+                pass
+
+
+
+        else:
+            theta = self.fc_loc(input.view(input.size(0),-1))
+            # 1. for only R transformation case
+            if self.trans_type == 'R':
+                theta = theta.unsqueeze(-1) # (N, 1, 1)
+                            
+                theta = torch.cos(theta) * self.cos_matrix + torch.sin(theta) * self.sin_matrix
+                self.theta = theta
+            
+            # 2. for general affine
+            elif self.trans_type == 'RTS':
+                theta = theta.view(-1, self.theta_row , self.theta_col) # (n, 2, 3)
+                self.theta = theta
+            else:
+                #TODO
+                pass
+
+            return self.theta
+
     
 
 

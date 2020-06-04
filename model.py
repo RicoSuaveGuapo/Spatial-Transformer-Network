@@ -64,6 +64,7 @@ class StModel(nn.Module):
     def forward(self, input):
         output = self.base_stn(input)       # (N, 28, 28)
         output = self.base_nn_model(output) # (N, 10)
+        # print(self.base_stn.theta[0,...])
 
         return output
     

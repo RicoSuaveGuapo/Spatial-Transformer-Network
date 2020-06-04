@@ -95,6 +95,8 @@ def main():
     if args.task_type == 'DistortedMNIST':
         if args.model_name == 'ST-CNN':            
             stn = BaseStn(model_name=args.model_name, trans_type=args.trans_type, input_ch=args.input_ch , input_length=args.input_length)
+            stn.load_state_dict(torch.load('/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/stn_11_DistortedMNIST_RTS_ST-CNN.pth'))
+
             base_cnn = BaseCnnModel(input_length=args.input_length, gap=args.gap)
             model = StModel(base_stn = stn, base_nn_model = base_cnn)
 
@@ -109,7 +111,8 @@ def main():
             
         
         elif args.model_name == 'ST-FCN':
-            stn = BaseStn(model_name=args.model_name, input_ch=args.input_ch , input_length=args.input_length)
+            stn = BaseStn(model_name=args.model_name, trans_type=args.trans_type, input_ch=args.input_ch , input_length=args.input_length)
+            stn.load_state_dict(torch.load('/home/jarvis1121/AI/Rico_Repo/Spatial-Transformer-Network/model_save/stn_11_DistortedMNIST_RTS_ST-CNN.pth'))
             base_fcn = BaseFcnModel(input_length=args.input_length)
             model = StModel(base_stn = stn, base_nn_model = base_fcn)
 
